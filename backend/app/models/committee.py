@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Date,Unicode
 from app.database.database import Base
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, validator
 from datetime import date, datetime
 from typing import List, Optional
 
@@ -56,24 +56,33 @@ class CommitteeCreate(BaseModel):
         from_attributes = True
 
 
-
 class CommitteeResponse(BaseModel):
- 
-    committeeNo:Optional[str]= None
+    id: Optional[int] = None
+    committeeNo: Optional[str] = None
     committeeDate: Optional[str] = None
-
     committeeTitle: Optional[str] = None
-    committeeBossName:Optional[str] = None
-    sex : Optional[str] =None
-    committeeCount:Optional[int] = None
-    sexCountPerCommittee:Optional[int] = None
+    committeeBossName: Optional[str] = None
+    sex: Optional[str] = None
+    committeeCount: Optional[int] = None
+    sexCountPerCommittee: Optional[int] = None
     notes: Optional[str] = None
     currentDate: Optional[str] = None
     userID: Optional[int] = None
 
+    @field_validator('committeeDate', 'currentDate', mode='before')
+    @classmethod
+    def convert_date_to_string(cls, value):
+        """Convert date objects to string format - PYDANTIC V2 COMPATIBLE"""
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value.strftime('%Y-%m-%d')
+        if isinstance(value, str):
+            return value
+        return str(value)
+
     class Config:
         from_attributes = True
-
 
 
 class PaginatedCommittees(BaseModel):
