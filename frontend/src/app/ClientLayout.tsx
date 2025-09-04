@@ -1,10 +1,11 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Navbar } from '@/components/Navbar';
-// import FooterComponent from '@/components/FooterComponent';
+
+import FooterComponent from '@/components/FooterComponent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Navbar from '@/components/Navbar';
 
 interface UserData {
   userID: string;
@@ -13,13 +14,13 @@ interface UserData {
 }
 
 interface ClientLayoutProps {   // combine UserData interface and children in single interface
-  children: React.ReactNode;
-  userData: UserData | null;   // userData it could UserData or null  
+  children?: React.ReactNode;
+  userData?: UserData | null;   // userData it could UserData or null  
 }
 
 //this action { children, userData }: ClientLayoutProps must destructuring from single props ClientLayoutProps
 
-export default function ClientLayout({ children, userData }: ClientLayoutProps) {  // will receive userData as props and pass it into Navbar
+export default function ClientLayout({ children }: ClientLayoutProps) {  // will receive userData as props and pass it into Navbar
   const pathname = usePathname();
   const isPrintRoute = pathname?.startsWith('/print');
   const isLoginRoute = pathname === '/login';
@@ -27,17 +28,17 @@ export default function ClientLayout({ children, userData }: ClientLayoutProps) 
   const hideLayout = isPrintRoute || isLoginRoute || isRegisterRoute;
 
   console.log("ClientLayout - Pathname:", pathname);
-  console.log("ClientLayout - UserData:", userData);
+  
 
   return (
     <div className="font-serif flex flex-col min-h-screen">
-      {!hideLayout && <Navbar userData={userData} />}    
+      {!hideLayout && <Navbar  />}    
 
       <main className="flex-grow">
         {children}
       </main>
 
-      {/* {!hideLayout && <FooterComponent />} */}
+      {!hideLayout && <FooterComponent />}
 
       <ToastContainer />
     </div>

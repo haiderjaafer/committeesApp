@@ -205,4 +205,41 @@ async def get_boss_name_suggestions(
         logger.error(f"Boss name suggestions error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@committeesRouter.get("/checkCommitteeNoExistsForDebounce")
+async def check_order_exists(
+    
+    committeeNo: str = Query(..., alias="committeeNo"),      # Required query parameter for committee number
+    committeeDate: str = Query(..., alias="committeeDate"),  # Required query parameter for full date (YYYY-MM-DD)
+    db: AsyncSession = Depends(get_async_db),      # Async database session dependency
+):
+
+    # Validate and extract year from bookDate
+    try:
+        print(committeeNo)
+        # Parse the input date to ensure it's in YYYY-MM-DD format//// Validation: Uses datetime.strptime to parse the date and validate the format
+        parsed_date = datetime.strptime(committeeDate.strip(), "%Y-%m-%d")
+        year = parsed_date.year  # Extract the year
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD (e.g., 2025-06-08)")
+
+    # Build async query to check for existence
+    query = select(Committee).filter(
+        Committee.committeeNo == committeeNo.strip(),  # Match committeeNo (strip whitespace)
+        
+        extract('year', Committee.committeeDate) == year   # this year front-end ... from Match year of bookDate //// SQLAlchemy extract: Uses extract('year', BookFollowUpTable.bookDate) to extract the year from the bookDate column in the database:
+
+
+    )
+
+    try:
+        # Execute query and fetch the first result
+        result = await db.execute(query)
+        committeeNo = result.scalars().first()  # Get the first matching record (or None if none found)
+        print(f"Query result: {committeeNo}")  # Debug query result
+        return {"exists": bool(committeeNo)}  # Return existence as boolean
+    except Exception as e:
+        print(f"Database error: {str(e)}")  # Debug database errors
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
+
         

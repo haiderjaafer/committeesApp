@@ -1,15 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from './ui/sheet';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import RotatingLogo from './RotatingLogo/RotatingLogo';
 
-// import RotatingLogo from './RotatingLogo/RotatingLogo';
-// import UserDropdown from './UserDropdownMenu';
 
 export type NavItem = {
   title: string;
@@ -35,8 +33,8 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       {
         title: 'إضافة كتاب',
-        href: '/addBooks/',
-        description: 'إضافة كتاب جديد إلى النظام',
+        href: '/addCommitteeBooks/',
+        description: 'إضافة كتاب لجنة جديد إلى النظام',
       },
     ],
   },
@@ -46,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
       {
         title: 'بحث',
         href: '/searchPanel',
-        description: 'خيارات البحث مع فلاتر متعددة وتعديل معلومات الكتب',
+        description: 'خيارات البحث المتقدم مع فلاتر متعددة',
       },
     ],
   },
@@ -56,8 +54,9 @@ const NAV_ITEMS: NavItem[] = [
       {
         title: 'تقرير الكتب',
         href: '/report_all',
-        description: 'تقرير الكتب المنجزة وقيد الانجاز حسب تأريخ الادخال',
+        description: 'تقرير كتب اللجنة   ',
       },
+      
     ],
   },
 ];
@@ -66,18 +65,7 @@ export function Navbar({ userData }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
-
-  const menuVariants = {
-    hidden: { opacity: 0, y: -10 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
-    exit: { opacity: 0, y: -10, transition: { duration: 0.2, ease: 'easeIn' } },
-  };
-
-  const submenuVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
-    visible: { opacity: 1, scale: 1, transition: { duration: 0.3, ease: 'easeOut' } },
-    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2, ease: 'easeIn' } },
-  };
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const headerRef = useRef<HTMLElement>(null);
 
@@ -89,15 +77,47 @@ export function Navbar({ userData }: NavbarProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Debugging logs
   console.log('Navbar - userData:', userData);
   console.log('Navbar - activeSubmenu:', activeSubmenu);
   console.log('Navbar - isScrolled:', isScrolled);
+
+  // Handle mouse enter for desktop hover
+  const handleMouseEnter = (title: string) => {
+    console.log('Mouse enter on:', title);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setActiveSubmenu(title);
+  };
+
+  // Handle mouse leave for desktop hover with delay
+  const handleMouseLeave = () => {
+    console.log('Mouse leave');
+    timeoutRef.current = setTimeout(() => {
+      console.log('Closing submenu after delay');
+      setActiveSubmenu(null);
+    }, 300); // Increased delay to allow clicks
+  };
+
+  // Handle click for mobile submenu toggle
+  const handleSubmenuToggle = (title: string) => {
+    console.log('Submenu toggled:', title);
+    setActiveSubmenu(activeSubmenu === title ? null : title);
+  };
+
+  // Handle clicks within the dropdown to prevent propagation
+  const handleDropdownClick = (e: React.MouseEvent) => {
+    console.log('Dropdown clicked');
+    e.stopPropagation(); // Prevent click from triggering parent events
+  };
 
   return (
     <header
       ref={headerRef}
       className={cn(
-        'sticky top-0 z-50 w-full border-b shadow-sm transition-all duration-200 bg-slate-600',
+        'sticky top-0 z-50 w-full border-b shadow-sm transition-all duration-200',
         isScrolled ? 'bg-[#99a1af]' : 'bg-gray-400'
       )}
       dir="rtl"
@@ -111,10 +131,9 @@ export function Navbar({ userData }: NavbarProps) {
                 variant="ghost"
                 size="icon"
                 className="hover:bg-sky-100/50 transition-colors duration-300"
+                onClick={() => console.log('Mobile menu button clicked')}
               >
-                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                  {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </motion.div>
+                {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                 <span className="sr-only">تبديل القائمة</span>
               </Button>
             </SheetTrigger>
@@ -123,73 +142,58 @@ export function Navbar({ userData }: NavbarProps) {
               <SheetDescription className="sr-only">
                 Make changes to your profile here
               </SheetDescription>
-              <motion.div
-                className="flex flex-col space-y-4 pt-6"
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                variants={menuVariants}
-              >
+              <div className="flex flex-col space-y-4 pt-6">
                 {NAV_ITEMS.map((item) => (
                   <div key={item.title} className="flex flex-col">
                     {item.children ? (
                       <>
-                        <motion.button
-                          whileHover={{ x: 5 }}
-                          transition={{ duration: 0.2 }}
-                          onClick={() =>
-                            setActiveSubmenu(activeSubmenu === item.title ? null : item.title)
-                          }
+                        <button
+                          onClick={() => handleSubmenuToggle(item.title)}
                           className={cn(
                             'flex items-center justify-between font-medium font-arabic py-2 text-base',
                             'hover:text-sky-600 hover:bg-sky-50 rounded-md px-3 transition-all duration-300'
                           )}
                         >
                           {item.title}
-                          <motion.span
-                            animate={{ rotate: activeSubmenu === item.title ? 180 : 0 }}
-                            transition={{ duration: 0.3 }}
+                          <span
+                            className={cn(
+                              'transition-transform duration-300',
+                              activeSubmenu === item.title ? 'rotate-180' : ''
+                            )}
                           >
                             ↓
-                          </motion.span>
-                        </motion.button>
-                        <AnimatePresence>
-                          {activeSubmenu === item.title && (
-                            <motion.div
-                              className="flex flex-col pr-4 space-y-2 mt-2"
-                              initial="hidden"
-                              animate="visible"
-                              exit="exit"
-                              variants={submenuVariants}
-                            >
-                              {item.children.map((child) => (
-                                <Link
-                                  key={child.title}
-                                  href={child.href || '#'}
-                                  target={child.target || '_self'}
-                                  className={cn(
-                                    'text-sm py-1.5 block font-arabic text-right',
-                                    'hover:text-sky-600 hover:bg-sky-50 rounded-md px-3 transition-all duration-300'
+                          </span>
+                        </button>
+                        {activeSubmenu === item.title && (
+                          <div className="flex flex-col pr-4 space-y-2 mt-2">
+                           
+                            {item.children.map((child) => (
+                              <Link
+                                key={child.title}
+                                href={child.href || '#'}
+                                target={child.target || '_self'}
+                                className={cn(
+                                  'text-sm py-1.5 block font-arabic text-right',
+                                  'hover:text-sky-600 hover:bg-sky-50 rounded-md px-3 transition-all duration-300'
+                                )}
+                                onClick={() => {
+                                  console.log('Mobile menu item clicked:', child.title);
+                                  setIsOpen(false);
+                                  setActiveSubmenu(null);
+                                }}
+                              >
+                                <div className="flex flex-col items-end">
+                                  <span>{child.title}</span>
+                                  {child.description && (
+                                    <span className="text-xs text-muted-foreground mt-1">
+                                      {child.description}
+                                    </span>
                                   )}
-                                  onClick={() => setIsOpen(false)}
-                                >
-                                  <motion.div
-                                    className="flex flex-col items-end"
-                                    whileHover={{ x: 3 }}
-                                    transition={{ duration: 0.2 }}
-                                  >
-                                    <span>{child.title}</span>
-                                    {child.description && (
-                                      <span className="text-xs text-muted-foreground mt-1">
-                                        {child.description}
-                                      </span>
-                                    )}
-                                  </motion.div>
-                                </Link>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <Link
@@ -199,112 +203,107 @@ export function Navbar({ userData }: NavbarProps) {
                           'font-medium font-arabic py-2 text-base',
                           'hover:text-sky-600 hover:bg-sky-50 rounded-md px-3 transition-all duration-300'
                         )}
-                        onClick={() => setIsOpen(false)}
+                        onClick={() => {
+                          console.log('Mobile menu item clicked:', item.title);
+                          setIsOpen(false);
+                        }}
                       >
-                        <motion.div whileHover={{ x: 5 }} transition={{ duration: 0.2 }}>
-                          {item.title}
-                        </motion.div>
+                        {item.title}
                       </Link>
                     )}
                   </div>
                 ))}
-              </motion.div>
+              </div>
             </SheetContent>
           </Sheet>
         </div>
 
         {/* Logo and Company Name */}
-       <Link
-  href="/"
-  className="md:flex gap-1.5 items-center mx-4 font-sans focus:outline-none focus:ring-0"
->
-  <div className="hidden sm:block">  {/*  only show logo ≥ 640px */}
-    {/* <RotatingLogo /> */}
-  </div>
-
-  <motion.span
-    className={cn(
-      "inline-block sm:text-lg text-sm bg-clip-text text-black animate-pulse",
-      isScrolled ? "font-extrabold text-white" : "font-extrabold "
-    )}
-    whileHover={{ scale: 1.05 }}
-    transition={{ duration: 0.2 }}
-  >
-    شركة مصافي الوسط - مصفى الدورة
-  </motion.span>
-</Link>
-
+        <Link
+          href="/"
+          className="hidden md:flex gap-1.5 items-center mx-4 font-sans focus:outline-none focus:ring-0"
+        >
+          <RotatingLogo />
+          <span
+            className={cn(
+              'inline-block text-lg bg-clip-text text-black animate-pulse',
+              isScrolled ? 'font-extrabold text-white' : 'font-extrabold'
+            )}
+          >
+            شركة مصافي الوسط
+          </span>
+        </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex flex-1 justify-center items-center gap-2">
           {NAV_ITEMS.map((item) => (
             <div
               key={item.title}
-              className="relative group"
-              onMouseEnter={() => setActiveSubmenu(item.title)}
-              onMouseLeave={() => setActiveSubmenu(null)}
+              className="relative p-2" // Added padding to prevent gap
+              onMouseEnter={() => handleMouseEnter(item.title)}
+              onMouseLeave={handleMouseLeave}
             >
               {item.children ? (
                 <>
-                  <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-                    <Button
-                      variant="ghost"
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      'font-arabic text-base font-semibold px-4 py-2',
+                      'hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-300'
+                    )}
+                    onClick={(e) => {
+                      console.log('Menu button clicked:', item.title);
+                      e.stopPropagation(); // Prevent click from closing dropdown
+                      setActiveSubmenu(activeSubmenu === item.title ? null : item.title);
+                    }}
+                  >
+                    {item.title}
+                    <span
                       className={cn(
-                        'font-arabic text-base font-semibold px-4 py-2',
-                        'hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-300'
+                        'mr-1 transition-transform duration-300',
+                        activeSubmenu === item.title ? 'rotate-180' : ''
                       )}
                     >
-                      {item.title}
-                      <motion.span
-                        animate={{ rotate: activeSubmenu === item.title ? 180 : 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="mr-1"
-                      >
-                        ↑
-                      </motion.span>
-                    </Button>
-                  </motion.div>
-                  <AnimatePresence>
-                    {activeSubmenu === item.title && (
-                      <motion.div
-                        className={cn(
-                          'absolute right-0 mt-2 w-64 rounded-xl bg-popover shadow-xl border border-sky-100/50',
-                          'backdrop-blur-sm'
-                        )}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        variants={submenuVariants}
-                      >
-                        <div className="py-2">
-                          {item.children.map((child) => (
-                            <Link
-                              key={child.title}
-                              href={child.href || '#'}
-                              target={child.target || '_self'}
-                              className={cn(
-                                'text-sm block px-4 py-2 font-arabic text-right',
-                                'hover:text-sky-600 hover:bg-sky-50 rounded-md transition-all duration-300'
+                      ↑
+                    </span>
+                  </Button>
+                  {activeSubmenu === item.title && (
+                    <div
+                      className={cn(
+                        'absolute right-0 mt-1 w-64 rounded-xl bg-popover shadow-xl border border-sky-100/50',
+                        'backdrop-blur-sm z-[1000]'
+                      )}
+                      onClick={handleDropdownClick}
+                    >
+                     
+                      <div className="py-2">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.title}
+                            href={child.href || '#'}
+                            target={child.target || '_self'}
+                            className={cn(
+                              'text-sm block px-4 py-2 font-arabic text-right',
+                              'hover:text-sky-600 hover:bg-sky-50 rounded-md transition-all duration-300'
+                            )}
+                            onClick={(e) => {
+                              console.log('Desktop submenu item clicked:', child.title);
+                              // Let navigation occur naturally; no need to setActiveSubmenu(null)
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-extrabold">{child.title}</span>
+                              {child.description && (
+                                <span className="text-xs font-bold text-muted-foreground mt-1">
+                                  {child.description}
+                                </span>
                               )}
-                            >
-                              <motion.div
-                                className="flex flex-col"
-                                whileHover={{ x: 3 }}
-                                transition={{ duration: 0.2 }}
-                              >
-                                <span className="font-extrabold">{child.title}</span>
-                                {child.description && (
-                                  <span className="text-xs font-bold text-muted-foreground mt-1">
-                                    {child.description}
-                                  </span>
-                                )}
-                              </motion.div>
-                            </Link>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <Link
@@ -314,10 +313,9 @@ export function Navbar({ userData }: NavbarProps) {
                     'font-arabic text-base font-semibold px-4 py-2',
                     'hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-300'
                   )}
+                  onClick={() => console.log('Desktop menu item clicked:', item.title)}
                 >
-                  <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-                    {item.title}
-                  </motion.div>
+                  {item.title}
                 </Link>
               )}
             </div>
@@ -325,25 +323,19 @@ export function Navbar({ userData }: NavbarProps) {
         </nav>
 
         {/* System Name */}
-        <Link href="/" className="hidden md:flex  items-center mx-4 font-arabic">
-          <motion.div className="flex items-center " whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
-            <span
-              className={cn(
-                'inline-block text-lg bg-clip-text text-black animate-pulse',
-                isScrolled ? 'font-extrabold text-white' : 'font-bold'
-              )}
-            >
-              نظام متابعة الكتب الالكتروني
-            </span>
-          </motion.div>
+        <Link href="/" className="hidden md:flex items-center mx-4 font-arabic">
+          <span
+            className={cn(
+              'inline-block text-lg bg-clip-text text-black animate-pulse',
+              isScrolled ? 'font-extrabold text-white' : 'font-bold'
+            )}
+          >
+            نظام متابعة الكتب الالكتروني
+          </span>
         </Link>
-
-        
-  
-
-        {/* {userData ? <UserDropdown userData={userData} /> : null } */}
-
       </div>
     </header>
   );
 }
+
+export default Navbar;

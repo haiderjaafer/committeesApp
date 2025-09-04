@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import 'react-toastify/dist/ReactToastify.css';
+import { Providers } from "./providers";
 import LayoutWrapper from "./LayoutWrapper";
-import { Navbar } from "@/components/Navbar";
 
 
 
 export const metadata: Metadata = {
-  title: "نظام ارشفة اللجان",
-  description: "نظام ارشفة اللجان لقسم الموارد البشرية",
+  title: "نظام متابعة الكتب",
+  description: "نظام متابعة الكتب والمذكرات المتأخرة",
 };
 
 export default function RootLayout({
@@ -21,13 +22,7 @@ export default function RootLayout({
     {/* <Navbar /> */}
     
     <main className="flex-grow">
-       {/* <LayoutWrapper>{children}</LayoutWrapper> */}
-
-        <>
-        <Navbar/>
-        {children}
-        
-        </>
+       <LayoutWrapper><Providers>{children}</Providers></LayoutWrapper>
     </main>
 
 
@@ -36,3 +31,9 @@ export default function RootLayout({
 
   );
 }
+
+
+// //npm install date-fns --legacy-peer-deps
+
+
+

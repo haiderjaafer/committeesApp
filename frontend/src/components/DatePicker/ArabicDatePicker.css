@@ -1,0 +1,25 @@
+.react-datepicker__close-icon {
+  left: 10px; /* move clear icon to the left */
+  right: auto;
+}
+
+.react-datepicker__input-container {
+  direction: rtl;
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name {
+  direction: rtl;
+  font-family: 'Arial', sans-serif;
+  font-size: 14px;
+}
+
+/* .react-datepicker__month-container {
+  direction: rtl;
+} */
+
+/* .react-datepicker__header {
+  direction: rtl;
+  text-align: right;
+} */
