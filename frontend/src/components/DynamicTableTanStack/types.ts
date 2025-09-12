@@ -29,6 +29,7 @@ export interface PDF {
 
 // Update TableData to include pdfFiles
 export interface CommitteeDataTable extends TableData {
+  serialNo:number;
   id: number;
   committeeNo: string | null;
   committeeDate: string | null;
@@ -45,7 +46,8 @@ export interface CommitteeDataTable extends TableData {
   countOfCommitteeBooks?: number; // Optional for lateBooks
 }
 
-export const orderHeaderMap: HeaderMap = {
+export const HeaderMap: HeaderMap = {
+  serialNo:"ت",
   id: "الايدي",
   committeeNo: "رقم اللجنة",
   committeeDate: "تأريخ اللجنة",

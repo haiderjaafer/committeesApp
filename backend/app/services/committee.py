@@ -117,7 +117,6 @@ class CommitteeService:
             }
     
 
-
     @staticmethod
     async def getCommitteeNoBYQueryParams(
         request: Request,
@@ -127,70 +126,48 @@ class CommitteeService:
         committeeNo: Optional[str] = None,
         committeeTitle: Optional[str] = None,
         committeeBossName: Optional[str] = None,
-        committeeDate_from: Optional[str] = None, 
-        committeeDate_to: Optional[str] = None 
-        # subject: Optional[str] = None,
-        # incomingNo: Optional[str] = None,
+        committeeDate_from: Optional[str] = None,
+        committeeDate_to: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Retrieve all BookFollowUpTable records with pagination, optional filters, and associated PDFs.
-        Includes departmentName and Com without relationships.
-        Returns data for DynamicTable with pdfFiles and username for each record.
+        Retrieve committee records with pagination and optional filters.
+        Supports independent filtering by committeeNo, committeeTitle, committeeBossName, or date range.
         """
         try:
-            # Optional filters
+            # Build filters dynamically
             filters = []
             if committeeNo:
                 filters.append(Committee.committeeNo == committeeNo.strip())
             if committeeTitle:
-                filters.append(Committee.committeeTitle == committeeTitle.strip().lower())
+                filters.append(Committee.committeeTitle.ilike(f"%{committeeTitle.strip().lower()}%"))
             if committeeBossName:
-                filters.append(Committee.committeeBossName == committeeBossName.strip())
-
-              
-            
-            if not committeeDate_from or not committeeDate_to:
-              logger.error("committeeDate_from and committeeDate_to are required when is True")
-              raise HTTPException(status_code=400, detail="committeeDate_from and committeeDate_to are required ")
-            else:
+                filters.append(Committee.committeeBossName.ilike(f"%{committeeBossName.strip()}%"))
+            if committeeDate_from and committeeDate_to:
                 try:
-                    start_date = datetime.strptime(committeeDate_from, '%Y-%m-%d').date()
-                    end_date = datetime.strptime(committeeDate_to, '%Y-%m-%d').date()
-
+                    start_date = datetime.strptime(committeeDate_from, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
                     if start_date > end_date:
-                        logger.error("startDate cannot be after endDate")
                         raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
-
-                    # Ensure currentDate is not NULL and within range
                     filters.append(Committee.committeeDate.isnot(None))
                     filters.append(Committee.committeeDate.between(start_date, end_date))
                     logger.debug(f"Applying date range filter: {start_date} to {end_date}")
-
                 except ValueError as e:
-                    logger.error(f"Invalid date format for startDate or endDate: {str(e)}")
+                    logger.error(f"Invalid date format: {str(e)}")
                     raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-                
-                for item in filters:
-                   print(item)
-            
 
-            # Step 1: Count distinct bookNo
+            # Count total records
             count_stmt = select(func.count()).select_from(
-                select(Committee.committeeNo,Committee.committeeBossName)
-                .distinct()
-                .filter(*filters)
-                .subquery()
+                select(Committee.committeeNo).distinct().filter(*filters).subquery()
             )
-        
             count_result = await db.execute(count_stmt)
             total = count_result.scalar() or 0
             logger.info(f"Total records: {total}, Page: {page}, Limit: {limit}")
 
-            # Step 2: Pagination offset
+            # Pagination offset
             offset = (page - 1) * limit
 
-            # Step 3: Select paginated BookFollowUpTable records with username, departmentName, and Com
-            book_stmt = (
+            # Fetch paginated records
+            query = (
                 select(
                     Committee.id,
                     Committee.committeeNo,
@@ -206,33 +183,32 @@ class CommitteeService:
                     Users.username,
                 )
                 .outerjoin(Users, Committee.userID == Users.id)
-               
                 .filter(*filters)
                 .distinct(Committee.committeeNo)
                 .order_by(Committee.committeeNo)
                 .offset(offset)
                 .limit(limit)
             )
-            book_result = await db.execute(book_stmt)
-            book_rows = book_result.fetchall()
+            result = await db.execute(query)
+            rows = result.fetchall()
 
-            # Step 4: Fetch PDFs for all bookNos in the current page, including username
-            book_nos = [row.committeeNo for row in book_rows]
+            # Fetch PDFs for the committeeNos
+            committee_nos = [row.committeeNo for row in rows]
             pdf_stmt = (
                 select(
                     PDFTable.id,
                     PDFTable.committeeNo,
                     PDFTable.pdf,
                     PDFTable.currentDate,
-                    Users.username
+                    Users.username,
                 )
                 .outerjoin(Users, PDFTable.userID == Users.id)
-                .filter(PDFTable.committeeNo.in_(book_nos))
+                .filter(PDFTable.committeeNo.in_(committee_nos))
             )
             pdf_result = await db.execute(pdf_stmt)
             pdf_rows = pdf_result.fetchall()
 
-            # Step 5: Group PDFs by bookNo
+            # Group PDFs by committeeNo
             pdf_map = {}
             for pdf in pdf_rows:
                 if pdf.committeeNo not in pdf_map:
@@ -240,47 +216,42 @@ class CommitteeService:
                 pdf_map[pdf.committeeNo].append({
                     "id": pdf.id,
                     "pdf": pdf.pdf,
-                    "currentDate": pdf.currentDate.strftime('%Y-%m-%d') if pdf.currentDate else None,
-                    "username": pdf.username
+                    "currentDate": pdf.currentDate.strftime("%Y-%m-%d") if pdf.currentDate else None,
+                    "username": pdf.username,
                 })
 
-            # Step 6: Format data
+            # Format response data
             data = [
                 {
+                    "serialNo": offset + i + 1,
                     "id": row.id,
                     "committeeNo": row.committeeNo,
-                    
-                    "committeeDate": row.committeeDate.strftime('%Y-%m-%d') if row.committeeDate else None,
+                    "committeeDate": row.committeeDate.strftime("%Y-%m-%d") if row.committeeDate else None,
                     "committeeTitle": row.committeeTitle,
                     "committeeBossName": row.committeeBossName,
-                   
                     "committeeCount": row.committeeCount,
                     "sex": row.sex,
                     "sexCountPerCommittee": row.sexCountPerCommittee,
-                    
                     "notes": row.notes,
-                    "currentDate": row.currentDate.strftime('%Y-%m-%d') if row.currentDate else None,
+                    "currentDate": row.currentDate.strftime("%Y-%m-%d") if row.currentDate else None,
                     "userID": row.userID,
                     "username": row.username,
-                    
-                   
-                    "pdfFiles": pdf_map.get(row.committeeNo, [])
+                    "pdfFiles": pdf_map.get(row.committeeNo, []),
                 }
-                for row in book_rows
+                for i, row in enumerate(rows)  # Fixed: Iterate over rows
             ]
-            logger.info(f"Fetched {len(data)} records with PDFs")
 
-            # Step 7: Response
+            logger.info(f"Fetched {len(data)} records with PDFs")
             return {
                 "data": data,
                 "total": total,
                 "page": page,
                 "limit": limit,
-                "totalPages": (total + limit - 1) // limit
+                "totalPages": (total + limit - 1) // limit,
             }
         except Exception as e:
-            logger.error(f"Error fetching books: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")  
+            logger.error(f"Error fetching committees: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         
 
 
