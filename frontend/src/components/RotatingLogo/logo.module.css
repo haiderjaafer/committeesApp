@@ -1,0 +1,27 @@
+@keyframes wiggleRotateScale {
+  0%   { transform: rotate(0deg) scale(0.3); }
+  25%  { transform: rotate(20deg) scale(0.5); }
+  50%  { transform: rotate(0deg) scale(0.6); }
+  75%  { transform: rotate(-20deg) scale(0.8); }
+  100% { transform: rotate(10deg) scale(1); }
+  
+}
+
+.rotate-infinite {
+  animation: wiggleRotateScale 3s ease-in-out infinite;
+  display: inline-block; /* Important to allow transform to work properly */
+  transform-origin: center;
+   
+  
+}
+
+
+
+
+
+
+/* rotate(±20deg) adds the twist motion.
+
+scale(1.0 → 1.2 → 1.0) adds a breathing, enlarging effect.
+
+transform-origin: center ensures the element rotates from the middle. */
