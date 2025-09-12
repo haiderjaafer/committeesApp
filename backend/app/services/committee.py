@@ -1,13 +1,15 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.PDFTable import PDFTable
-from app.models.committee import Committee, CommitteeCreate
+from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
 from app.models.users import Users
 import logging
+
+
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -291,3 +293,79 @@ class CommitteeService:
             raise HTTPException(status_code=500, detail="Error retrieving committee count")
 
             
+
+    @staticmethod
+    async def committeeReportMethod(
+        db: AsyncSession,
+        committeeDate_from: Optional[str] = None,
+        committeeDate_to: Optional[str] = None,
+        
+    ) -> List[CommitteeResponse]:
+        
+        try:
+            # Step 1: Build filters
+            filters = []
+            
+            if committeeDate_from and committeeDate_to:
+                try:
+                    start_date = datetime.strptime(committeeDate_from, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
+                    if start_date > end_date:
+                        raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
+                    filters.append(Committee.committeeDate.isnot(None))
+                    filters.append(Committee.committeeDate.between(start_date, end_date))
+                    logger.debug(f"Applying date range filter: {start_date} to {end_date}")
+                except ValueError as e:
+                    logger.error(f"Invalid date format: {str(e)}")
+                    raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+            # Step 3: Fetch matching records with optional user info
+            stmt = (
+                select(
+                    Committee.id,
+                    Committee.committeeNo,
+                    Committee.committeeDate,
+                    Committee.committeeTitle,
+                    Committee.committeeBossName,
+                    Committee.committeeCount,
+                    Committee.sex,
+                    Committee.sexCountPerCommittee,
+                    Committee.notes,
+                    Committee.userID,
+                    Committee.currentDate,
+                    Users.username,
+                )
+                .outerjoin(Users, Committee.userID == Users.id)
+               
+                .filter(*filters)
+                .order_by(Committee.committeeDate)
+            )
+
+            result = await db.execute(stmt)
+            rows = result.fetchall()
+
+            # Step 4: Format response
+            return [
+                {
+                #    "serialNo": offset + i + 1,
+                    "id": row.id,
+                    "committeeNo": row.committeeNo,
+                    "committeeDate": row.committeeDate.strftime("%Y-%m-%d") if row.committeeDate else None,
+                    "committeeTitle": row.committeeTitle,
+                    "committeeBossName": row.committeeBossName,
+                    "committeeCount": row.committeeCount,
+                    "sex": row.sex,
+                    "sexCountPerCommittee": row.sexCountPerCommittee,
+                    "notes": row.notes,
+                    "currentDate": row.currentDate.strftime("%Y-%m-%d") if row.currentDate else None,
+                    "userID": row.userID,
+                    "username": row.username,
+                }
+                for row in rows
+            ]
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in reportBookFollowUp: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error retrieving filtered report.")

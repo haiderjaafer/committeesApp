@@ -1,0 +1,36 @@
+
+
+/* === Print Styling === */
+@media print {
+  .printButton,
+  .navbar,
+  .cancelButton {
+    display: none !important;
+  }
+
+  .container {
+    padding: 0;
+    margin: 0;
+    max-width: 100%;
+    box-shadow: none;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 1mm;
+  }
+
+  .table thead {
+    display: table-header-group;
+  }
+
+  .table tbody {
+    display: table-row-group;
+  }
+
+  .table tr,
+  .table td,
+  .table th {
+    page-break-inside: avoid;
+  }
+}

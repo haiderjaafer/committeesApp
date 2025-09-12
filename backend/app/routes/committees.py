@@ -14,7 +14,7 @@ from fastapi import APIRouter
 from app.database.config import settings
 from app.helper.save_pdf import save_pdf_to_server
 from app.models.PDFTable import DeletePDFRequest, PDFCreate, PDFResponse, PDFTable
-from app.models.committee import Committee, CommitteeCreate
+from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
 from app.models.committeeSearch import AutoSuggestionRequest, AutoSuggestionResponse, CommitteeBossNameResponse, CommitteeNoResponse, CommitteeSearchRequest, CommitteeSearchResponse, CommitteeTitleResponse
 from app.models.users import Users
 from app.services.committee import CommitteeService
@@ -403,4 +403,15 @@ async def getCommitteeCountsRoute(db: AsyncSession = Depends(get_async_db)):
     print("getCommitteeCountsRoute ... route")
     return await CommitteeService.getAllCommitteeCountsMethod(db)    
   
-        
+
+
+
+@committeesRouter.get("/report", response_model=List[CommitteeResponse])
+async def committeeReportFunction(
+    committeeDate_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    committeeDate_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_async_db)
+):
+  
+    print(committeeDate_from + committeeDate_to)
+    return await CommitteeService.committeeReportMethod(db, committeeDate_from, committeeDate_to)

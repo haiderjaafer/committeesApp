@@ -53,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       {
         title: 'تقرير الكتب',
-        href: '/landing',
+        href: '/committeeReport',
         description: 'تقرير كتب اللجنة   ',
       },
       {
