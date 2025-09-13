@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.PDFTable import PDFTable
+from app.models.PDFTable import PDFResponse, PDFTable
 from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
 from app.models.users import Users
 import logging
@@ -369,3 +369,82 @@ class CommitteeService:
         except Exception as e:
             logger.error(f"Error in reportBookFollowUp: {str(e)}")
             raise HTTPException(status_code=500, detail="Error retrieving filtered report.")
+
+
+
+    
+    @staticmethod
+    async def getCommitteeWithPdfsByIDMethod(db: AsyncSession, id: int) -> CommitteeResponse:
+       
+        try:
+            # Fetch book, PDFs, and users in a single query
+            result = await db.execute(
+                select(Committee, PDFTable, Users)
+                .outerjoin(PDFTable, Committee.id == PDFTable.committeeID)
+                
+                .outerjoin(Users, PDFTable.userID == Users.id)  # Join Users with PDFTable.userID
+                .filter(Committee.id == id)
+            )
+            rows = result.fetchall()
+            
+            if not rows or not rows[0][0]:
+                logger.error(f"Committee ID {id} not found")
+                raise HTTPException(status_code=404, detail="Committee not found")
+
+            # Extract book, PDFs, user, committee, and department
+            book = rows[0][0]
+        
+            pdfs = [(row[1], row[2]) for row in rows if row[1]] or []  # Pair PDF with its user
+
+            # Convert date fields to strings for book
+            ConvertedCommitteeDate = book.committeeDate.strftime('%Y-%m-%d') if isinstance(book.committeeDate, date) else book.committeeDate
+            
+
+            # Construct PDF responses
+            pdf_responses = [
+                PDFResponse(
+                    id=pdf.id,
+                    committeeID=pdf.committeeID,
+                    committeeNo=pdf.committeeNo,
+                    pdf=pdf.pdf,
+                    currentDate=pdf.currentDate,
+                    username=user.username if user else None
+                )
+                for pdf, user in pdfs
+            ]
+
+            # Fetch the book owner's username separately if needed
+            book_user = None
+            if book.userID:
+                book_user_result = await db.execute(
+                    select(Users).filter(Users.id == book.userID)
+                )
+                book_user = book_user_result.scalars().first()
+
+            # Construct response
+            CommitteeResponsedata = CommitteeResponse(
+                id= book.id,
+                committeeNo= book.committeeNo,
+                committeeDate= ConvertedCommitteeDate,
+                committeeTitle= book.committeeTitle,
+                committeeBossName= book.committeeBossName,
+                sex= book.sex,
+                committeeCount= book.committeeCount,
+                sexCountPerCommittee= book.sexCountPerCommittee,
+                notes= book.notes,
+                currentDate= book.currentDate,
+                userID= book.userID,
+                username=book_user.username if book_user else None,
+
+                
+            )
+
+            logger.info(f"Fetched Committee ID {id} with {len(pdf_responses)} PDFs and username {CommitteeResponsedata.username}")
+            return CommitteeResponsedata
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error Committee  ID {id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")    
+        

@@ -68,6 +68,7 @@ class CommitteeResponse(BaseModel):
     notes: Optional[str] = None
     currentDate: Optional[str] = None
     userID: Optional[int] = None
+    username: Optional[str] = None
 
     @field_validator('committeeDate', 'currentDate', mode='before')
     @classmethod

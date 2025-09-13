@@ -31,7 +31,7 @@ class PDFCreate(BaseModel):
 class PDFResponse(BaseModel):
     id: int
     committeeNo: Optional[str]
-    committeeID: Optional[str]
+    committeeID: Optional[int]
     pdf: Optional[str]
     currentDate: Optional[date]  # Stringified date
     username: Optional[str] = None  # Added username from users table

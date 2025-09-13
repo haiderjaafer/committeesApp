@@ -256,7 +256,7 @@ export default function DynamicTable<T extends CommitteeDataTable>({
           
               <Link 
               
-               href={`/updateBooks/${row.original.id}`} 
+               href={`/updateCommittee/${row.original.id}`} 
                               
                     >
                     

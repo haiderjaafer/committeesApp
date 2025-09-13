@@ -415,3 +415,21 @@ async def committeeReportFunction(
   
     print(committeeDate_from + committeeDate_to)
     return await CommitteeService.committeeReportMethod(db, committeeDate_from, committeeDate_to)
+
+
+
+@committeesRouter.get("/getCommitteeWithPdfsByID/{id}", response_model=CommitteeResponse)
+async def getCommitteeWithPdfsByIDFunction(
+    id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+   
+    try:
+        CommitteeData = await CommitteeService.getCommitteeWithPdfsByIDMethod(db, id)
+        return CommitteeData
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching book ID {id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
