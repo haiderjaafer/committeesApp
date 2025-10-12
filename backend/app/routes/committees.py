@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 import logging
 import os
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Form, Depends
 from fastapi.responses import FileResponse
 import pydantic
@@ -433,3 +433,66 @@ async def getCommitteeWithPdfsByIDFunction(
         logger.error(f"Error fetching book ID {id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
+
+
+
+
+
+@committeesRouter.patch("/{id}", response_model=Dict[str, Any])
+async def updateRecordFunction(
+    id: int,
+    committeeNo: Optional[str] = Form(None),
+    committeeDate: Optional[date] = Form(None),
+    committeeTitle: Optional[str] = Form(None),
+    committeeBossName: Optional[str] = Form(None),
+    sex: Optional[str] = Form(None),
+    committeeCount: Optional[int] = Form(None),
+    sexCountPerCommittee: Optional[int] = Form(None),
+    notes: Optional[str] = Form(None),
+    currentDate: Optional[date] = Form(None),
+    userID: Optional[int] = Form(None),
+    file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Update a committee record by ID
+    """
+    try:
+        print(f"Route - Updating record ID: {id}")
+        
+        # Build update dictionary
+        update_data = {
+            k: v for k, v in {
+                "committeeNo": committeeNo,
+                "committeeDate": committeeDate,
+                "committeeTitle": committeeTitle,
+                "committeeBossName": committeeBossName,
+                "sex": sex,
+                "committeeCount": committeeCount,
+                "sexCountPerCommittee": sexCountPerCommittee,
+                "notes": notes,
+                "currentDate": currentDate,
+                "userID": userID
+            }.items() if v is not None
+        }
+        
+        # Pass file object and update_data to service
+        updated_record = await CommitteeService.UpdateRecord(
+            db, 
+            id, 
+            update_data,
+            file  # Pass the file to service
+        )
+        
+        return {
+            "success": True,
+            "message": "Record updated successfully",
+            "data": updated_record
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Server error: {str(e)}"
+        )

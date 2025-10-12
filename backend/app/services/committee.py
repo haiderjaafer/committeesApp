@@ -3,11 +3,15 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.PDFTable import PDFResponse, PDFTable
+from datetime import date, datetime
+from app.helper.save_pdf import save_pdf_to_server
+from app.models.PDFTable import PDFCreate, PDFResponse, PDFTable
 from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
 from app.models.users import Users
+from app.database.config import settings
 import logging
+
+from app.services.pdf import PDFService
 
 
 
@@ -447,4 +451,157 @@ class CommitteeService:
         except Exception as e:
             logger.error(f"Error Committee  ID {id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")    
+
+
+    
+    from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, Any, Optional
+from fastapi import HTTPException, UploadFile
+from datetime import date
+import logging
+
+logger = logging.getLogger(__name__)
+
+class CommitteeService:
+    
+    @staticmethod
+    async def UpdateRecord(
+        db: AsyncSession,
+        id: int,
+        update_data: Dict[str, Any],
+        file: Optional[UploadFile] = None
+    ) -> Dict[str, Any]:
+        """
+        Update a committee record in the database
         
+        Args:
+            db: Database session
+            id: Record ID to update
+            update_data: Dictionary containing fields to update
+            file: Optional uploaded file
+            
+        Returns:
+            Updated record as dictionary
+        """
+        try:
+            print(f"Service - Updating committee ID: {id}")
+            
+            # Validate that there's data to update
+            if not update_data and not file:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No fields provided for update"
+                )
+            
+            # Check if record exists
+            stmt = select(Committee).where(Committee.id == id)
+            result = await db.execute(stmt)
+            existing_record = result.scalar_one_or_none()
+            
+            if not existing_record:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Committee with ID {id} not found"
+                )
+            
+            userID =  update_data.get('userID') or existing_record.userID
+            
+            # Handle file upload if provided
+            if file is not None:
+                # Get committeeNo and committeeDate from update_data or existing record
+                committee_no = update_data.get('committeeNo') or existing_record.committeeNo
+                committee_date = update_data.get('committeeDate') or existing_record.committeeDate
+
+                
+                # Validate required fields for file upload
+                if not committee_no:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="committeeNo is required for file upload"
+                    )
+                if not committee_date:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="committeeDate is required for file upload"
+                    )
+                
+                # Convert date to string format YYYY-MM-DD
+                if isinstance(committee_date, date):
+                    committee_date_str = committee_date.isoformat()
+                else:
+                    committee_date_str = str(committee_date)
+                
+                # Get current count (or default to 0)
+                # current_count = existing_record.committeeCount or 0
+                
+                # Save the file using your existing helper function
+                try:
+                    count = await PDFService.get_pdf_count(db, id)
+                    file_path = save_pdf_to_server(
+                        source_file=file.file,
+                        committeeNo=committee_no,
+                        committeeDate=committee_date_str,
+                        count=count,
+                        dest_dir=settings.PDF_UPLOAD_PATH
+                    )
+                    # Add file path to update_data
+                    update_data["file_path"] = file_path
+
+                    pdf_data = PDFCreate(
+                         committeeID= id,
+                         committeeNo =committee_no,
+                         countPdf= count,
+                         pdf= file_path,
+                         userID = userID,
+                        currentDate=datetime.now().date().isoformat()
+                    )
+                    await PDFService.insert_pdf(db, pdf_data)
+                    logger.info(f"Successfully saved PDF for book ID {id}")
+                    
+                except FileExistsError as e:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=str(e)
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error saving file: {str(e)}"
+                    )
+            
+            # Update the record
+            for key, value in update_data.items():
+                if hasattr(existing_record, key):
+                    setattr(existing_record, key, value)
+            
+            # Commit changes
+            await db.commit()
+            await db.refresh(existing_record)
+            
+            # Convert to dictionary
+            return {
+                "id": existing_record.id,
+                "committeeNo": existing_record.committeeNo,
+                "committeeDate": existing_record.committeeDate.isoformat() if existing_record.committeeDate else None,
+                "committeeTitle": existing_record.committeeTitle,
+                "committeeBossName": existing_record.committeeBossName,
+                "sex": existing_record.sex,
+                "committeeCount": existing_record.committeeCount,
+                "sexCountPerCommittee": existing_record.sexCountPerCommittee,
+                "notes": existing_record.notes,
+                "currentDate": existing_record.currentDate.isoformat() if existing_record.currentDate else None,
+                "userID": existing_record.userID,
+                "file_path": getattr(existing_record, 'file_path', None)
+            }
+            
+        except HTTPException:
+            await db.rollback()
+            raise
+        except Exception as e:
+            logger.error(f"Error updating committee ID {id}: {str(e)}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
+            )

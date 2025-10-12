@@ -66,29 +66,9 @@ interface CommitteeFormType {
   userID: string;
 }
 
-// Animation variants for Framer Motion
-const formVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: 'easeOut' },
-  },
-};
 
-const inputVariants = {
-  hidden: { opacity: 0, x: -10 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.3, ease: 'easeOut' },
-  },
-};
 
-const cardVariants = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
-};
+
 
 interface UpdateCommitteeByIDProps {
   committeeId: string;
@@ -389,17 +369,21 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
     [formData, selectedFile, committeeId, userID, API_BASE_URL, payload.username]
   );
 
+
+  // render pdf file with every record todo separate into component
+  
+
   const renderPDFs = useMemo(() => {
     if (pdfFiles.length === 0) {
       return (
-        <motion.div variants={inputVariants} className="mt-6 text-center">
+        <div  className="mt-6 text-center">
           <p className="font-arabic text-gray-500">لا توجد ملفات PDF مرفقة</p>
-        </motion.div>
+        </div>
       );
     }
 
     return (
-      <motion.div variants={inputVariants} className="mt-6">
+      <div  className="mt-6">
         <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
           <DialogTrigger asChild>
             <Button
@@ -422,12 +406,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
             </DialogHeader>
             <div className="space-y-4 mt-4">
               {pdfFiles.map((pdf, index) => (
-                <motion.div
+                <div
                   key={pdf.id}
-                  variants={cardVariants}
-                  initial="hidden"
-                  animate="visible"
-                  transition={{ delay: index * 0.1 }}
+              
+                
                 >
                   <Card className="bg-white shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl border border-blue-100 overflow-hidden">
                     <CardHeader className="bg-gradient-to-r from-blue-100 to-teal-100 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4">
@@ -468,12 +450,12 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                       </Button>
                     </CardFooter>
                   </Card>
-                </motion.div>
+                </div>
               ))}
             </div>
           </DialogContent>
         </Dialog>
-      </motion.div>
+      </div>
     );
   }, [pdfFiles, pdfDialogOpen, API_BASE_URL]);
 
@@ -493,11 +475,9 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
   console.log("committeeID: " + committeeId);
 
   return (
-    <motion.div
+    <div
       className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-sky-50/50 py-4 sm:py-6 md:py-8 lg:py-12"
-      initial="hidden"
-      animate="visible"
-      variants={formVariants}
+    
     >
       <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto p-4 sm:p-6 md:p-8 bg-white rounded-2xl shadow-lg border border-sky-100/50">
         <h1 className="text-2xl sm:text-3xl md:text-3xl lg:text-3xl font-bold font-arabic text-center text-sky-600 mb-6 sm:mb-8">
@@ -507,7 +487,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             
             {/* Committee Number */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="committeeNo"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -523,10 +503,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
               />
-            </motion.div>
+            </div>
 
             {/* Committee Date */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="committeeDate"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -538,10 +518,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 onChange={(date) => handleDateChange('committeeDate', date)}
                 allowEmpty={false}
               />
-            </motion.div>
+            </div>
 
             {/* Committee Title */}
-            <motion.div variants={inputVariants} className="sm:col-span-2 lg:col-span-1">
+            <div  className="sm:col-span-2 lg:col-span-1">
               <label
                 htmlFor="committeeTitle"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -557,10 +537,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
               />
-            </motion.div>
+            </div>
 
             {/* Committee Boss Name */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="committeeBossName"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -576,10 +556,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
               />
-            </motion.div>
+            </div>
 
             {/* Sex */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="sex"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -598,10 +578,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 <option value="male">ذكر</option>
                 <option value="female">أنثى</option>
               </select>
-            </motion.div>
+            </div>
 
             {/* Committee Count */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="committeeCount"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -617,10 +597,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 min="0"
               />
-            </motion.div>
+            </div>
 
             {/* Sex Count Per Committee */}
-            <motion.div variants={inputVariants}>
+            <div >
               <label
                 htmlFor="sexCountPerCommittee"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -636,10 +616,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 min="0"
               />
-            </motion.div>
+            </div>
 
             {/* Notes */}
-            <motion.div variants={inputVariants} className="sm:col-span-2 lg:col-span-3">
+            <div  className="sm:col-span-2 lg:col-span-3">
               <label
                 htmlFor="notes"
                 className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
@@ -654,11 +634,11 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-gray-300 transition-all duration-200 font-arabic text-right resize-y text-sm leading-6 placeholder:text-center placeholder:font-extrabold placeholder:text-gray-300 placeholder:italic"
                 rows={4}
               />
-            </motion.div>
+            </div>
           </div>
 
           {/* Dropzone for PDF Upload */}
-          <motion.div variants={inputVariants} className="mt-6">
+          <div  className="mt-6">
             <label className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right">
               تحميل ملف PDF جديد
             </label>
@@ -669,16 +649,15 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
               onBookPdfLoaded={handleCommitteePdfLoaded} 
               username={payload.username}           
             />
-          </motion.div>
+          </div>
 
           {/* Display PDFs */}
           {renderPDFs}
 
           {/* Submit Button */}
-          <motion.div
+          <div
             className="flex justify-center mt-6"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          
           >
             <Button
               type="submit"
@@ -687,9 +666,9 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
             >
               {isSubmitting ? 'جاري التحديث...' : 'تحديث اللجنة'}
             </Button>
-          </motion.div>
+          </div>
         </form>
       </div>
-    </motion.div>
+    </div>
   );
 }

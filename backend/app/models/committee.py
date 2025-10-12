@@ -94,3 +94,34 @@ class PaginatedCommittees(BaseModel):
     totalPages: int
 
 
+class CommitteeUpdate(BaseModel):
+
+    committeeNo:Optional[str]= None
+    committeeDate: Optional[str] = None
+    committeeTitle: Optional[str] = None
+    committeeBossName:Optional[str] = None
+    sex : Optional[str] =None
+    committeeCount:Optional[int] = None
+    sexCountPerCommittee:Optional[int] = None
+    notes: Optional[str] = None
+    currentDate: Optional[str] = None
+    userID: Optional[int] = None
+   
+
+    @field_validator('committeeDate', 'currentDate')
+    def validate_date(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                datetime.strptime(value, '%Y-%m-%d')
+                return value
+            except ValueError:
+                raise ValueError(f"Invalid date format for {value}; expected YYYY-MM-DD")
+        elif isinstance(value, date):
+            return value.strftime('%Y-%m-%d')
+        raise ValueError(f"Invalid date type for {value}; expected string or date")
+
+    class Config:
+        from_attributes = True
+
