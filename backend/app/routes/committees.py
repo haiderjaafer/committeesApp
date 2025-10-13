@@ -1,9 +1,9 @@
-from datetime import date, datetime
+from datetime import datetime,date
 import logging
 import os
 import traceback
-from typing import Any, Dict, List, Optional, Union
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Form, Depends
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Body, File, HTTPException, Query, Request, UploadFile, Form, Depends
 from fastapi.responses import FileResponse
 import pydantic
 from sqlalchemy import select,extract, desc
@@ -432,14 +432,141 @@ async def getCommitteeWithPdfsByIDFunction(
     except Exception as e:
         logger.error(f"Error fetching book ID {id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    
 
+# without file route accept body
+@committeesRouter.patch("/{id}/json", response_model=Dict[str, Any])
+async def updateRecordWithoutFile(
+    id: int,
+    data: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Update a committee record by ID (without file upload)
+    Content-Type: application/json
+    """
+    try:
+        print(f"Route (No File) - Updating record ID: {id}")
+        
+        # Extract and validate data
+        update_data = {}
+        
+        if data.get('committeeNo') is not None:
+            update_data['committeeNo'] = data['committeeNo']
+        if data.get('committeeDate') is not None:
+            update_data['committeeDate'] = data['committeeDate']
+        if data.get('committeeTitle') is not None:
+            update_data['committeeTitle'] = data['committeeTitle']
+        if data.get('committeeBossName') is not None:
+            update_data['committeeBossName'] = data['committeeBossName']
+        if data.get('sex') is not None:
+            update_data['sex'] = data['sex']
+        if data.get('committeeCount') is not None:
+            update_data['committeeCount'] = data['committeeCount']
+        if data.get('sexCountPerCommittee') is not None:
+            update_data['sexCountPerCommittee'] = data['sexCountPerCommittee']
+        if data.get('notes') is not None:
+            update_data['notes'] = data['notes']
+        if data.get('currentDate') is not None:
+            update_data['currentDate'] = data['currentDate']
+        if data.get('userID') is not None:
+            update_data['userID'] = data['userID']
+        
+        if not update_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+        
+        updated_record = await CommitteeService.UpdateRecordWithoutFile(
+            db, 
+            id, 
+            update_data
+        )
+        
+        return {
+            "success": True,
+            "message": "Record updated successfully",
+            "data": updated_record
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Server error: {str(e)}"
+        )    
+    
+# # without file
+# @committeesRouter.patch("/{id}/json", response_model=Dict[str, Any])
+# async def updateRecordWithoutFile(
+#     id: int,
+#     committeeNo: Optional[str] = Form(None),
+#     committeeDate: Optional[date] = Form(None),
+#     committeeTitle: Optional[str] = Form(None),
+#     committeeBossName: Optional[str] = Form(None),
+#     sex: Optional[str] = Form(None),
+#     committeeCount: Optional[int] = Form(None),
+#     sexCountPerCommittee: Optional[int] = Form(None),
+#     notes: Optional[str] = Form(None),
+#     currentDate: Optional[date] = Form(None),
+#     userID: Optional[int] = Form(None),
+#     db: AsyncSession = Depends(get_async_db)
+# ):
+#     """
+#     Update a committee record by ID (without file upload)
+#     Content-Type: multipart/form-data (but no file)
+#     """
+#     try:
+#         print(f"Route (No File) - Updating record ID: {id}")
+        
+#         # Build update dictionary
+#         update_data = {
+#             k: v for k, v in {
+#                 "committeeNo": committeeNo,
+#                 "committeeDate": committeeDate,
+#                 "committeeTitle": committeeTitle,
+#                 "committeeBossName": committeeBossName,
+#                 "sex": sex,
+#                 "committeeCount": committeeCount,
+#                 "sexCountPerCommittee": sexCountPerCommittee,
+#                 "notes": notes,
+#                 "currentDate": currentDate,
+#                 "userID": userID
+#             }.items() if v is not None
+#         }
+        
+#         # Validate that there's data to update
+#         if not update_data:
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="No fields provided for update"
+#             )
+        
+#         # Call service method without file
+#         updated_record = await CommitteeService.UpdateRecordWithoutFile(
+#             db, 
+#             id, 
+#             update_data
+#         )
+        
+#         return {
+#             "success": True,
+#             "message": "Record updated successfully",
+#             "data": updated_record
+#         }
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Server error: {str(e)}"
+#         )    
+    
 
-
-
-
-
+# with file
 @committeesRouter.patch("/{id}", response_model=Dict[str, Any])
-async def updateRecordFunction(
+async def updateRecordWithFile(
     id: int,
     committeeNo: Optional[str] = Form(None),
     committeeDate: Optional[date] = Form(None),
@@ -451,14 +578,29 @@ async def updateRecordFunction(
     notes: Optional[str] = Form(None),
     currentDate: Optional[date] = Form(None),
     userID: Optional[int] = Form(None),
-    file: Optional[UploadFile] = File(None),
+    username: Optional[str] = Form(None),
+    file: UploadFile = File(...),  # File is REQUIRED in this route
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Update a committee record by ID
+    Update a committee record by ID with file upload
+    Content-Type: multipart/form-data
     """
     try:
-        print(f"Route - Updating record ID: {id}")
+        print(f"Route (With File) - Updating record ID: {id}")
+        
+        # Validate file
+        if not file or file.size == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="File is required for this endpoint"
+            )
+        
+        if file.content_type != 'application/pdf':
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are allowed"
+            )
         
         # Build update dictionary
         update_data = {
@@ -476,17 +618,18 @@ async def updateRecordFunction(
             }.items() if v is not None
         }
         
-        # Pass file object and update_data to service
-        updated_record = await CommitteeService.UpdateRecord(
+        # Call service method with file
+        updated_record = await CommitteeService.UpdateRecordWithFile(
             db, 
             id, 
             update_data,
-            file  # Pass the file to service
+            file,
+            username
         )
         
         return {
             "success": True,
-            "message": "Record updated successfully",
+            "message": "Record and file updated successfully",
             "data": updated_record
         }
     except HTTPException:
