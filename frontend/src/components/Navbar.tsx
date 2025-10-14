@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from './ui/sheet';
 import { cn } from '@/lib/utils';
 import RotatingLogo from './RotatingLogo/RotatingLogo';
+import UserDropdown from './UserDropdownMenu';
 
 
 export type NavItem = {
@@ -336,8 +337,13 @@ export function Navbar({ userData }: NavbarProps) {
           >
             نظام ارشفة اللجان الالكتروني
           </span>
+       {userData ? <UserDropdown userData={userData} /> : null } 
         </Link>
+        
+
+        
       </div>
+
     </header>
   );
 }

@@ -20,7 +20,7 @@ interface ClientLayoutProps {   // combine UserData interface and children in si
 
 //this action { children, userData }: ClientLayoutProps must destructuring from single props ClientLayoutProps
 
-export default function ClientLayout({ children }: ClientLayoutProps) {  // will receive userData as props and pass it into Navbar
+export default function ClientLayout({ children,userData }: ClientLayoutProps) {  // will receive userData as props and pass it into Navbar
   const pathname = usePathname();
   const isPrintRoute = pathname?.startsWith('/print');
   const isLoginRoute = pathname === '/login';
@@ -32,7 +32,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {  // will
 
   return (
     <div className="font-serif flex flex-col min-h-screen">
-      {!hideLayout && <Navbar  />}    
+      {!hideLayout && <Navbar userData={userData}  />}    
 
       <main className="flex-grow">
         {children}
