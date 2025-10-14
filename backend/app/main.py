@@ -16,6 +16,8 @@ from app.database.config import settings
 #  Import your route modules
 from app.routes.committees import committeesRouter
 # from app.routes.authentication import router
+from app.routes.authentication import router
+
 
 
 @asynccontextmanager
@@ -63,7 +65,7 @@ def create_app() -> FastAPI:              #create_app() just defines a factory f
 
     #  Register routers
     app.include_router(committeesRouter)
-    # app.include_router(router)
+    app.include_router(router)
 
     return app
 
