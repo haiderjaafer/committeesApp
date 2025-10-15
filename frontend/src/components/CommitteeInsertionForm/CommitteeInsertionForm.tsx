@@ -10,6 +10,7 @@ import axios from 'axios';
 import ArabicDatePicker from '@/components/DatePicker/ArabicDatePicker';
 import DropzoneComponent, { DropzoneComponentRef } from '@/components/ReactDropZoneComponont';
 import { JWTPayload } from '@/utiles/verifyToken';
+import { BossNameAutocomplete } from '../BossName';
 
 
 interface CommitteeFormData {
@@ -17,9 +18,9 @@ interface CommitteeFormData {
   committeeDate: string;
   committeeTitle: string;
   committeeBossName: string;
-  sex: string;
+  sex?: string;
   committeeCount: string;
-  sexCountPerCommittee: string;
+  //sexCountPerCommittee?: string;
   notes: string;
   userID: string;
 }
@@ -53,7 +54,7 @@ export default function CommitteeInsertionForm( {payload}: CommitteeInsertionFor
     committeeBossName: '',
     sex: '',
     committeeCount: '',
-    sexCountPerCommittee: '',
+   // sexCountPerCommittee: '',
     notes: '',
     userID: userID,
   });
@@ -204,29 +205,28 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
       e.preventDefault();
       setIsSubmitting(true);
 
-      // Validate required fields
-      const requiredFields: (keyof CommitteeFormData)[] = [
-        'committeeNo',
-        'committeeDate',
-        'committeeTitle',
-        'committeeBossName',
-        'sex',
-        'committeeCount',
-        'sexCountPerCommittee',
-        'userID',
-      ];
+ const requiredFields: (keyof CommitteeFormData)[] = [
+      'committeeNo',
+      'committeeDate',
+      'committeeTitle',
+      'committeeBossName',
+      
+      'committeeCount',
+     // 'sexCountPerCommittee',
+      'userID',
+    ];
 
-      const fieldLabels: Record<keyof CommitteeFormData, string> = {
-        committeeNo: 'رقم اللجنة',
-        committeeDate: 'تاريخ اللجنة',
-        committeeTitle: 'عنوان اللجنة',
-        committeeBossName: 'اسم رئيس اللجنة',
-        sex: 'الجنس',
-        committeeCount: 'عدد اللجان',
-        sexCountPerCommittee: 'عدد الأفراد حسب الجنس',
-        notes: 'الملاحظات',
-        userID: 'معرف المستخدم',
-      };
+    const fieldLabels: Record<keyof CommitteeFormData, string> = {
+      committeeNo: 'رقم اللجنة',
+      committeeDate: 'تاريخ اللجنة',
+      committeeTitle: 'عنوان اللجنة',
+      committeeBossName: 'اسم رئيس اللجنة',
+      sex: 'الجنس',
+      committeeCount: 'عدد اللجان',
+     // sexCountPerCommittee: 'عدد الأفراد حسب الجنس',
+      notes: 'الملاحظات',
+      userID: 'معرف المستخدم',
+    };
 
       for (const field of requiredFields) {
         if (!formData[field]) {
@@ -268,7 +268,7 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
             committeeBossName: '',
             sex: '',
             committeeCount: '',
-            sexCountPerCommittee: '',
+            //sexCountPerCommittee: '',
             notes: '',
             userID:"1",
           });
@@ -375,7 +375,17 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
   >
     رئيس اللجنة
   </label>
-  <input
+<BossNameAutocomplete
+    value={formData.committeeBossName}
+    onChange={(value) => setFormData(prev => ({ ...prev, committeeBossName: value }))}
+    onSelect={(bossName) => {
+      console.log('Selected boss name:', bossName);
+      // Optional: fetch all committees for this boss name
+    }}
+  />
+  
+  {/* <input
+     autoComplete='off'
     id="committeeBossName"
     name="committeeBossName"
     type="text"
@@ -384,34 +394,34 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
     placeholder="اسم رئيس اللجنة"
     className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
     required
-  />
+  /> */}
 </div>
 
            
 
             {/* Sex */}
-            <div>
-              <label
-                htmlFor="sex"
-                className="block text-sm font-extrabold text-gray-700 mb-1 text-right"
-              >
-                الجنس
-              </label>
-              <select
-                id="sex"
-                name="sex"
-                value={formData.sex}
-                onChange={handleChange}
-                className="w-full h-12 px-4 py-2 border text-sm font-extrabold border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
-              >
-                <option value="">اختر الجنس</option>
-                <option value="ذكر">ذكر</option>
-                <option value="أنثى">أنثى</option>
-              </select>
-            </div>
+      {/* Sex - Now Optional */}
+<div>
+  <label
+    htmlFor="sex"
+    className="block text-sm font-extrabold text-gray-700 mb-1 text-right"
+  >
+    الجنس <span className="text-gray-400 text-xs">(اختياري)</span>
+  </label>
+  <select
+    id="sex"
+    name="sex"
+    value={formData.sex}
+    onChange={handleChange}
+    className="w-full h-12 px-4 py-2 border text-sm font-extrabold border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
+  >
+    <option value="">اختر الجنس (اختياري)</option>
+    <option value="ذكر">ذكر</option>
+    <option value="أنثى">أنثى</option>
+  </select>
+</div>
 
-            {/* Committee Count */}
+            
             <div>
               <label
                 htmlFor="committeeCount"
@@ -425,19 +435,19 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 type="text"
                 value={formData.committeeCount}
                 onChange={handleChange}
-                placeholder="عدد اللجان"
+                placeholder="عدد اعضاء اللجنة"
                 className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
               />
             </div>
 
-            {/* Sex Count Per Committee */}
-            <div>
+            
+            {/* <div>
               <label
                 htmlFor="sexCountPerCommittee"
                 className="block text-sm font-extrabold text-gray-700 mb-1 text-right"
               >
-                عدد الأفراد حسب الجنس
+                عدد اعضاء اللجنة
               </label>
               <input
                 id="sexCountPerCommittee"
@@ -445,11 +455,11 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 type="text"
                 value={formData.sexCountPerCommittee}
                 onChange={handleChange}
-                placeholder="عدد الأفراد حسب الجنس"
+                placeholder="عدد اعضاء اللجنة"
                 className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
               />
-            </div>
+            </div> */}
 
             {/* Notes */}
             <div className="sm:col-span-2 lg:col-span-3">

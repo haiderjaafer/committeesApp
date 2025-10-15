@@ -1,3 +1,4 @@
+
 from datetime import datetime,date
 import logging
 import os
@@ -9,7 +10,7 @@ import pydantic
 from sqlalchemy import select,extract, desc
 from sqlalchemy.ext.asyncio import AsyncSession  
 from app.database.database import get_async_db
-
+from pydantic import BaseModel, Field
 from fastapi import APIRouter
 from app.database.config import settings
 from app.helper.save_pdf import save_pdf_to_server
@@ -43,9 +44,9 @@ async def addCommitteeDoc(
     committeeDate: str = Form(...),
     committeeTitle: str = Form(...),
     committeeBossName: str = Form(...),
-    sex: str = Form(...),
-    committeeCount: str = Form(...),
-    sexCountPerCommittee: str = Form(...),
+    # sex: Optional[str] = Form(...),
+    committeeCount: Optional[int] = Form(...),
+    # sexCountPerCommittee: Optional[int] = Form(...),
  
     notes: str = Form(...),
     userID: str = Form(...),
@@ -63,9 +64,9 @@ async def addCommitteeDoc(
                             committeeDate = committeeDate,
                             committeeTitle= committeeTitle,
                             committeeBossName= committeeBossName,
-                            sex =sex,
+                            # sex =sex,
                             committeeCount= committeeCount,
-                            sexCountPerCommittee=sexCountPerCommittee,
+                            # sexCountPerCommittee=sexCountPerCommittee,
                             notes = notes,
                             currentDate = datetime.today().strftime('%Y-%m-%d'),
                             userID = userID
@@ -639,3 +640,29 @@ async def updateRecordWithFile(
             status_code=500,
             detail=f"Server error: {str(e)}"
         )
+
+
+
+
+
+class CommitteeBossName(BaseModel):
+    BossName: str = Field(..., min_length=1, max_length=500, description="BossName to search for")
+
+@committeesRouter.post("/getRecordsCommitteeBossName", response_model=Dict[str, Any])
+async def getRecordsCommitteeBossNameFunction(
+    request: CommitteeBossName,
+    db: AsyncSession = Depends(get_async_db),
+) -> Dict[str, Any]:
+    """
+    Get committee records by boss name
+    Returns all committees with matching boss name
+    """
+    try:
+        logger.info(f"Received POST request for BossName: {request.BossName}")
+        logger.info(f"BossName length: {len(request.BossName)}")
+        return await CommitteeService.getBossNameSuggestions(db, request.BossName)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in POST getRecords BossName: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

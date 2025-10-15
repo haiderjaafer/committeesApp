@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from urllib.parse import unquote
 from app.helper.save_pdf import save_pdf_to_server
 from app.models.PDFTable import PDFCreate, PDFResponse, PDFTable
 from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
@@ -180,8 +180,8 @@ class CommitteeService:
                     Committee.committeeTitle,
                     Committee.committeeBossName,
                     Committee.committeeCount,
-                    Committee.sex,
-                    Committee.sexCountPerCommittee,
+                    
+                   
                     Committee.notes,
                     Committee.userID,
                     Committee.currentDate,
@@ -235,8 +235,8 @@ class CommitteeService:
                     "committeeTitle": row.committeeTitle,
                     "committeeBossName": row.committeeBossName,
                     "committeeCount": row.committeeCount,
-                    "sex": row.sex,
-                    "sexCountPerCommittee": row.sexCountPerCommittee,
+                   
+                   
                     "notes": row.notes,
                     "currentDate": row.currentDate.strftime("%Y-%m-%d") if row.currentDate else None,
                     "userID": row.userID,
@@ -642,3 +642,69 @@ class CommitteeService:
                 status_code=500,
                 detail=f"Database error: {str(e)}"
             )
+        
+
+
+        
+    @staticmethod
+    async def getBossNameSuggestions(
+        db: AsyncSession,
+        BossName: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get unique boss name suggestions for autocomplete
+        More efficient - only returns unique names, not full records
+        """
+        try:
+            if not BossName:
+                raise HTTPException(status_code=400, detail="BossName is required")
+            
+            logger.info(f"Getting suggestions for BossName: {BossName}")
+            
+            # Get distinct boss names matching the search
+            stmt = select(
+                Committee.committeeBossName, func.count(Committee.id).label('committee_count')
+            ).where(
+                Committee.committeeBossName.ilike(f"%{BossName}%")
+            ).group_by(
+                # Committee.committeeBossName,Committee.id
+                 Committee.committeeBossName
+            ).order_by(
+                func.count(Committee.id).desc()  # Most used names first
+            ).limit(10)  # Limit for autocomplete
+            
+            result = await db.execute(stmt)
+            suggestions = result.all()
+            
+            if not suggestions:
+                return {
+                    "success": True,
+                    "message": "No suggestions found",
+                    "count": 0,
+                    "suggestions": []
+                }
+            
+            # Format suggestions with count
+            formatted_suggestions = [
+                {
+                    # "id":row.id,
+                    "bossName": row.committeeBossName,
+                    "count": row.committee_count
+                }
+                for row in suggestions
+            ]
+            
+            logger.info(f"Found {len(suggestions)} unique boss names")
+            
+            return {
+                "success": True,
+                "message": f"Found {len(suggestions)} suggestions",
+                "count": len(suggestions),
+                "suggestions": formatted_suggestions
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in getBossNameSuggestions: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal server error")
