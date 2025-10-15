@@ -13,7 +13,7 @@ class Committee(Base):
     committeeDate = Column(Date, nullable=True)
     committeeTitle = Column(Unicode, nullable=True)
     committeeBossName = Column(Unicode(100), nullable=True)
-    # sex = Column(Unicode(10), nullable=True)
+    sex = Column(Unicode(10), nullable=True)
     committeeCount = Column(Integer, nullable=True)
     # sexCountPerCommittee= Column(Integer, nullable=True)
     notes = Column(Unicode(500), nullable=True)
@@ -30,7 +30,7 @@ class CommitteeCreate(BaseModel):
     committeeDate: Optional[str] = None
     committeeTitle: Optional[str] = None
     committeeBossName:Optional[str] = None
-    # sex : Optional[str] =None
+    sex : Optional[str] =None
     committeeCount:Optional[int] = None
     # sexCountPerCommittee:Optional[int] = None
     notes: Optional[str] = None
@@ -62,7 +62,7 @@ class CommitteeResponse(BaseModel):
     committeeDate: Optional[str] = None
     committeeTitle: Optional[str] = None
     committeeBossName: Optional[str] = None
-    # sex: Optional[str] = None
+    sex: Optional[str] = None
     committeeCount: Optional[int] = None
     # sexCountPerCommittee: Optional[int] = None
     notes: Optional[str] = None

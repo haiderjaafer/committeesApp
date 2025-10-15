@@ -40,48 +40,43 @@ async def test_path():
 
 @committeesRouter.post("/post")
 async def addCommitteeDoc( 
-    committeeNo:str= Form(...),
+    committeeNo: str = Form(...),
     committeeDate: str = Form(...),
     committeeTitle: str = Form(...),
     committeeBossName: str = Form(...),
-    # sex: Optional[str] = Form(...),
-    committeeCount: Optional[int] = Form(...),
-    # sexCountPerCommittee: Optional[int] = Form(...),
- 
-    notes: str = Form(...),
+    sex: Optional[str] = Form(None),  #  Changed from Form(...) to Form(None)
+    committeeCount: Optional[int] = Form(None),  #  Changed from Form(...) to Form(None)
+    notes: Optional[str] = Form(None),  #  Changed from Form(...) to Form(None)
     userID: str = Form(...),
-    file: UploadFile = Form(...),
-    # username: str = Form(),
+    file: UploadFile = File(...),  #  Changed from Form(...) to File(...)
     db: AsyncSession = Depends(get_async_db)
-    
-
 ):
-
+    """
+    Add a new committee with PDF file
+    Required fields: committeeNo, committeeDate, committeeTitle, committeeBossName, userID, file
+    Optional fields: sex, committeeCount, notes
+    """
     try: 
-
         committeesDocsData = CommitteeCreate(
-                            committeeNo=committeeNo,
-                            committeeDate = committeeDate,
-                            committeeTitle= committeeTitle,
-                            committeeBossName= committeeBossName,
-                            # sex =sex,
-                            committeeCount= committeeCount,
-                            # sexCountPerCommittee=sexCountPerCommittee,
-                            notes = notes,
-                            currentDate = datetime.today().strftime('%Y-%m-%d'),
-                            userID = userID
-                            )
+            committeeNo=committeeNo,
+            committeeDate=committeeDate,
+            committeeTitle=committeeTitle,
+            committeeBossName=committeeBossName,
+            sex=sex,  #  Can be None now
+            committeeCount=committeeCount,
+            notes=notes,
+            currentDate=datetime.today().strftime('%Y-%m-%d'),
+            userID=userID
+        )
         
-        
-        newCommiteeID = await CommitteeService.insertCommitteesDocsData(db,committeesDocsData)
+        # Insert committee record
+        newCommiteeID = await CommitteeService.insertCommitteesDocsData(db, committeesDocsData)
         print(f"Inserted committee with ID: {newCommiteeID}")
-
-        print(f" {committeesDocsData}")
+        print(f"Committee data: {committeesDocsData}")
 
         # Count PDFs
         count = await PDFService.get_pdf_count(db, newCommiteeID)
-        print(f"PDF count for new Commitee record {newCommiteeID}: {count}")
-
+        print(f"PDF count for new Committee record {newCommiteeID}: {count}")
 
         # Save file
         upload_dir = settings.PDF_UPLOAD_PATH
@@ -96,27 +91,27 @@ async def addCommitteeDoc(
         pdf_data = PDFCreate(
             committeeID=newCommiteeID,
             committeeNo=committeeNo,
-            committeeDate= committeeDate,
-            countPdf=count,
+            committeeDate=committeeDate,
+            countPdf=count + 1,  #  Increment count
             pdf=pdf_path,
             userID=int(userID),
             currentDate=datetime.now().date().isoformat()
         )
-        print(f"Inserted PDF record... pdf_data: {pdf_data}")
+        print(f"Inserting PDF record: {pdf_data}")
         await PDFService.insert_pdf(db, pdf_data)
-        print(f"Inserted PDF record... pdf_data: {pdf_data}")
+        print(f"Successfully inserted PDF record")
 
         return {
-            "id" : newCommiteeID,
-            "count": count
+            "success": True,
+            "message": "Committee and PDF added successfully",
+            "id": newCommiteeID,
+            "count": count + 1
         }
 
-        
-
     except Exception as e:
-        print(f"❌ Error in add_book_with_pdf: {str(e)}")
+        print(f"❌ Error in addCommitteeDoc: {str(e)}")
+        logger.error(f"Error in addCommitteeDoc: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
-
 
 
 @committeesRouter.get("/lastCommitteeNo")
@@ -666,3 +661,30 @@ async def getRecordsCommitteeBossNameFunction(
     except Exception as e:
         logger.error(f"Error in POST getRecords BossName: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@committeesRouter.get("/boss/{bossName}", response_model=Dict[str, Any])
+async def getCommitteesByBossNameWithDetails(
+    bossName: str,
+    db: AsyncSession = Depends(get_async_db)
+) -> Dict[str, Any]:
+    """
+    Get all committees with full details by boss name
+    Includes related PDFs and all committee information
+    
+    Example: GET /api/committees/boss/رامي%20خالد%20مجيد%20الدلوي
+    """
+    try:
+        logger.info(f"Fetching committees for boss: {bossName}")
+        
+        # Decode URL-encoded boss name
+        from urllib.parse import unquote
+        decoded_boss_name = unquote(bossName)
+        
+        return await CommitteeService.getCommitteesByBossNameWithDetails(db, decoded_boss_name)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in getCommitteesByBossNameWithDetails: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

@@ -1,7 +1,4 @@
-"use client"
-
 'use client';
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -295,6 +292,18 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
   );
 
 
+   //  Memoize the onSelect callback in parent too
+  const handleBossNameSelect = useCallback((bossName: string) => {
+    console.log(' Selected boss name in parent:', bossName);
+    
+    // Optional: Fetch all committees for this boss name
+    // fetchCommitteesForBoss(bossName);
+    
+    // Optional: Show toast notification
+    // toast.info(`تم اختيار: ${bossName}`);
+  }, []);
+
+
 
 
  
@@ -330,6 +339,7 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 placeholder="رقم اللجنة"
                 className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
+                autoComplete='off'
               />
             </div>
 
@@ -365,6 +375,7 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 placeholder="عنوان اللجنة"
                 className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
+                autoComplete='off'
               />
             </div>
 
@@ -375,14 +386,12 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
   >
     رئيس اللجنة
   </label>
+
 <BossNameAutocomplete
-    value={formData.committeeBossName}
-    onChange={(value) => setFormData(prev => ({ ...prev, committeeBossName: value }))}
-    onSelect={(bossName) => {
-      console.log('Selected boss name:', bossName);
-      // Optional: fetch all committees for this boss name
-    }}
-  />
+        value={formData.committeeBossName}
+        onChange={(value) => setFormData(prev => ({ ...prev, committeeBossName: value }))}
+        onSelect={handleBossNameSelect} //  Use memoized callback
+      />
   
   {/* <input
      autoComplete='off'
@@ -427,7 +436,7 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 htmlFor="committeeCount"
                 className="block text-sm font-extrabold text-gray-700 mb-1 text-right"
               >
-                عدد اللجان
+                عدد اعضاء اللجنة
               </label>
               <input
                 id="committeeCount"
@@ -438,30 +447,10 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 placeholder="عدد اعضاء اللجنة"
                 className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
                 required
+                autoComplete='off'
               />
             </div>
 
-            
-            {/* <div>
-              <label
-                htmlFor="sexCountPerCommittee"
-                className="block text-sm font-extrabold text-gray-700 mb-1 text-right"
-              >
-                عدد اعضاء اللجنة
-              </label>
-              <input
-                id="sexCountPerCommittee"
-                name="sexCountPerCommittee"
-                type="text"
-                value={formData.sexCountPerCommittee}
-                onChange={handleChange}
-                placeholder="عدد اعضاء اللجنة"
-                className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
-              />
-            </div> */}
-
-            {/* Notes */}
             <div className="sm:col-span-2 lg:col-span-3">
               <label
                 htmlFor="notes"
@@ -477,6 +466,7 @@ const handleCommitteeChange = useCallback((e: React.ChangeEvent<HTMLInputElement
                 placeholder="الملاحظات"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right resize-y"
                 rows={4}
+                autoComplete='off'
               />
             </div>
           </div>

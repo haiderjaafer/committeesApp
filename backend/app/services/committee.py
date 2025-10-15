@@ -708,3 +708,117 @@ class CommitteeService:
         except Exception as e:
             logger.error(f"Error in getBossNameSuggestions: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Internal server error")
+        
+
+
+
+
+    @staticmethod
+    async def getCommitteesByBossNameWithDetails(
+        db: AsyncSession,
+        bossName: str
+    ) -> Dict[str, Any]:
+        """
+        Get all committees with full details by boss name
+        Includes PDFs, user info, and all related data
+        """
+        try:
+            logger.info(f"Searching for committees with boss name: {bossName}")
+            
+            if not bossName or bossName.strip() == "":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Boss name is required"
+                )
+            
+            # Query committees with exact match (case-insensitive)
+            stmt = (
+                select(Committee)
+                .where(Committee.committeeBossName.ilike(bossName))
+                .order_by(Committee.committeeDate.desc())
+            )
+            
+            result = await db.execute(stmt)
+            committees = result.scalars().all()
+            
+            if not committees:
+                return {
+                    "success": True,
+                    "message": f"No committees found for boss: {bossName}",
+                    "bossName": bossName,
+                    "count": 0,
+                    "data": []
+                }
+            
+            # Build detailed response for each committee
+            committees_data = []
+            
+            for committee in committees:
+                # Get PDFs for this committee
+                pdf_stmt = select(PDFTable).where(PDFTable.committeeID == committee.id)
+                pdf_result = await db.execute(pdf_stmt)
+                pdfs = pdf_result.scalars().all()
+                
+                # Get user info if userID exists
+                user_info = None
+                if committee.userID:
+                    user_stmt = select(Users).where(Users.id == committee.userID)
+                    user_result = await db.execute(user_stmt)
+                    user = user_result.scalar_one_or_none()
+                    if user:
+                        user_info = {
+                            "id": user.id,
+                            "username": user.username,
+                            "email": getattr(user, 'email', None)
+                        }
+                
+                # Format PDF data
+                pdf_data = []
+                for pdf in pdfs:
+                    pdf_data.append({
+                        "id": pdf.id,
+                        "committeeID": pdf.committeeID,
+                        "committeeNo": pdf.committeeNo,
+                        "countPdf": pdf.countPdf,
+                        "pdf": pdf.pdf,
+                        "currentDate": pdf.currentDate.isoformat() if pdf.currentDate else None,
+                        "userID": pdf.userID
+                    })
+                
+                # Build committee data
+                committee_dict = {
+                    "id": committee.id,
+                    "committeeNo": committee.committeeNo,
+                    "committeeDate": committee.committeeDate.isoformat() if committee.committeeDate else None,
+                    "committeeTitle": committee.committeeTitle,
+                    "committeeBossName": committee.committeeBossName,
+                    "sex": committee.sex,
+                    "committeeCount": committee.committeeCount,
+                    "notes": committee.notes,
+                    "currentDate": committee.currentDate.isoformat() if committee.currentDate else None,
+                    "userID": committee.userID,
+                    "user": user_info,
+                    "pdfs": pdf_data,
+                    "pdfCount": len(pdf_data)
+                }
+                
+                committees_data.append(committee_dict)
+            
+            logger.info(f"Found {len(committees_data)} committees for boss: {bossName}")
+            
+            return {
+                "success": True,
+                "message": f"Found {len(committees_data)} committees",
+                "bossName": bossName,
+                "count": len(committees_data),
+                "data": committees_data
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in getCommitteesByBossNameWithDetails: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
+            )    
