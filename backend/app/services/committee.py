@@ -822,3 +822,85 @@ class CommitteeService:
                 status_code=500,
                 detail=f"Database error: {str(e)}"
             )    
+        
+
+
+
+
+
+    @staticmethod
+    async def getCommitteesDetailsByBossNameReport(
+        db: AsyncSession,
+        bossName: str
+    ) -> Dict[str, Any]:
+        """
+        Get all committees report data by boss name
+        Returns only Committee model fields for report generation
+        """
+        try:
+            logger.info(f"Searching for committees report with boss name: {bossName}")
+            
+            # Validate boss name
+            if not bossName or bossName.strip() == "":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Boss name is required"
+                )
+            
+            # Query committees with exact match (case-insensitive)
+            stmt = (
+                select(Committee)
+                .where(Committee.committeeBossName.ilike(bossName))
+                .order_by(Committee.committeeDate.desc())
+            )
+            
+            result = await db.execute(stmt)
+            committees = result.scalars().all()
+            
+            if not committees:
+                return {
+                    "success": True,
+                    "message": f"No committees found for boss: {bossName}",
+                    "bossName": bossName,
+                    "count": 0,
+                    "reportDate": datetime.now().isoformat(),
+                    "data": []
+                }
+            
+            # Build report data with only Committee model fields
+            report_data: List[Dict[str, Any]] = []
+            
+            for committee in committees:
+                committee_dict = {
+                    "id": committee.id,
+                    "committeeNo": committee.committeeNo,
+                    "committeeDate": committee.committeeDate.isoformat() if committee.committeeDate else None,
+                    "committeeTitle": committee.committeeTitle,
+                    "committeeBossName": committee.committeeBossName,
+                    "sex": committee.sex,
+                    "committeeCount": committee.committeeCount,
+                    "notes": committee.notes,
+                    "currentDate": committee.currentDate.isoformat() if committee.currentDate else None,
+                    "userID": committee.userID
+                }
+                report_data.append(committee_dict)
+            
+            logger.info(f"Found {len(report_data)} committees for report")
+            
+            return {
+                "success": True,
+                "message": f"Report generated successfully",
+                "bossName": bossName,
+                "count": len(report_data),
+                "reportDate": datetime.now().isoformat(),
+                "data": report_data
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in getCommitteesDetailsByBossNameReport: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
+            )

@@ -1,3 +1,4 @@
+import { BossNameFormData } from "../BossNameReportSelection/BossNameComponent";
 import { CommitteeReportData } from "./types";
 
 export const buildQueryString = (data: CommitteeReportData): string => {
@@ -9,6 +10,17 @@ export const buildQueryString = (data: CommitteeReportData): string => {
 
   if (data.committeeDate_to.trim()) {
     params.append("committeeDate_to", data.committeeDate_to);
+  }
+
+  return params.toString();
+};
+
+
+export const buildQueryStringBossName = (data: BossNameFormData): string => {
+  const params = new URLSearchParams();
+
+  if (data.bossName && data.bossName.trim()) {
+    params.append("bossName", data.bossName.trim());
   }
 
   return params.toString();

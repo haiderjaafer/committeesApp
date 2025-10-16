@@ -167,14 +167,16 @@ function CommitteeCard({
         <h3 className="font-bold font-arabic text-lg text-sky-700 mb-2">
           {committee.committeeTitle}
         </h3>
-        <div className="flex items-center gap-3 text-xs text-gray-600">
+        <div className="flex items-center gap-6 text-xs text-gray-600">
           <span className="flex items-center gap-1 font-arabic">
             <FileText className="h-3 w-3" />
-            {committee.committeeNo}
+            <span className='font-extrabold text-lg'>رقم اللجنة : </span>
+            <h1 className='font-extrabold text-lg'>{committee.committeeNo}</h1>
           </span>
-          <span className="flex items-center gap-1 font-arabic">
+          <span className="flex items-center  gap-1 font-arabic">
             <Calendar className="h-3 w-3" />
-            {committee.committeeDate}
+            <span className='font-extrabold text-lg'>تأريخ اللجنة :</span>
+           <h1 className='font-extrabold text-lg'> {committee.committeeDate}</h1>
           </span>
         </div>
       </div>
@@ -190,7 +192,7 @@ function CommitteeCard({
         {committee.notes && (
           <div className="pt-2 border-t mt-2">
             <p className="text-xs text-gray-600 font-arabic line-clamp-2">
-              <span className="font-semibold">ملاحظات:</span> {committee.notes}
+              <span className="font-extrabold text-lg">ملاحظات:</span> <span className=' font-extrabold text-lg'>{committee.notes}</span>
             </p>
           </div>
         )}
@@ -205,19 +207,20 @@ function CommitteeCard({
       الملفات ({committee.pdfCount})
     </p>
     <div className="space-y-1">
-      {committee.pdfs.map((pdfItem) => {
+      {committee.pdfs.map((pdfItem,index) => {
         return (
           <a 
-            key={pdfItem.id}
+            // key={pdfItem.id}
+            key={index}
             href={`${apiUrl}/api/committees/pdf/file/${pdfItem.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between p-2 bg-gray-50 hover:bg-sky-50 rounded text-xs transition-colors group"
           >
-            <span className="text-red-600 font-arabic group-hover:text-sky-700">
-              📄 PDF #{pdfItem.countPdf}
+            <span className="text-green-700 font-arabic group-hover:text-sky-700">
+              📄 PDF {index+1} - {pdfItem.countPdf}
             </span>
-            <span className="text-gray-500 font-arabic">
+            <span className="text-gray-500 font-arabic font-extrabold text-lg">
               {pdfItem.currentDate}
             </span>
           </a>
@@ -235,8 +238,8 @@ function CommitteeCard({
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <p className="font-arabic text-xs flex justify-between">
-      <span className="font-semibold text-gray-700">{label}:</span>
-      <span className="text-gray-600">{value}</span>
+      <span className="font-extrabold text-lg  text-gray-700">{label}:</span>
+      <span className="text-gray-600 font-extrabold text-lg ">{value}</span>
     </p>
   );
 }

@@ -113,14 +113,14 @@ export default function CommitteeBossNameComoboxComponent({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="justify-between font-bold h-12"
+          className="justify-between font-bold h-12 w-[530px]"
         >
           {value || 'البحث عن اسم رئيس اللجنة'}
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-full p-0">
+      <PopoverContent className=" p-0 w-[530px]">
         <Command>
           <CommandInput
             placeholder="البحث عن اسم رئيس اللجنة..."

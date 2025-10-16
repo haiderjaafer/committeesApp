@@ -7,8 +7,8 @@ import LayoutWrapper from "./LayoutWrapper";
 
 
 export const metadata: Metadata = {
-  title: "نظام متابعة الكتب",
-  description: "نظام متابعة الكتب والمذكرات المتأخرة",
+  title: "نظام لجان شركة مصافي الوسط",
+  description: "نظام ادخال وبحث وتقارير لجان الشركة",
 };
 
 export default function RootLayout({

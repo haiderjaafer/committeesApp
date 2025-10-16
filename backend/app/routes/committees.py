@@ -21,6 +21,7 @@ from app.models.users import Users
 from app.services.committee import CommitteeService
 from app.services.committeeSearch import CommitteeSearchService, get_committee_search_service
 from app.services.pdf import PDFService
+from urllib.parse import unquote
 
 
 committeesRouter = APIRouter(prefix="/api/committees", tags=["COMMITTEES"])
@@ -687,4 +688,34 @@ async def getCommitteesByBossNameWithDetails(
         raise
     except Exception as e:
         logger.error(f"Error in getCommitteesByBossNameWithDetails: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    
+
+
+
+
+
+@committeesRouter.get("/reportBasedOnBossName/{bossName}", response_model=Dict[str, Any])
+async def getCommitteesDetailsByBossNameReport(
+    bossName: str,
+    db: AsyncSession = Depends(get_async_db)
+) -> Dict[str, Any]:
+    """
+    Get committees report by boss name
+    Returns all committee fields for report generation
+    
+    Example: GET /api/committees/reportBasedOnBossName/رامي%20خالد%20مجيد%20الدلوي
+    """
+    try:
+        logger.info(f"Fetching committees report for boss: {bossName}")
+        
+        # Decode URL-encoded boss name
+        decoded_boss_name = unquote(bossName)
+        
+        return await CommitteeService.getCommitteesDetailsByBossNameReport(db, decoded_boss_name)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in getCommitteesDetailsByBossNameReport: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

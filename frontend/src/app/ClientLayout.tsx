@@ -1,11 +1,11 @@
 'use client';
-
 import { usePathname } from 'next/navigation';
-
 import FooterComponent from '@/components/FooterComponent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from '@/components/Navbar';
+
+
 
 interface UserData {
   userID: string;
@@ -25,7 +25,9 @@ export default function ClientLayout({ children,userData }: ClientLayoutProps) {
   const isPrintRoute = pathname?.startsWith('/print');
   const isLoginRoute = pathname === '/login';
   const isRegisterRoute = pathname === '/register';
-  const hideLayout = isPrintRoute || isLoginRoute || isRegisterRoute;
+  const bossName =  pathname?.startsWith('/bossNameDetails');
+
+  const hideLayout = isPrintRoute || isLoginRoute || isRegisterRoute || bossName;
 
   console.log("ClientLayout - Pathname:", pathname);
   
