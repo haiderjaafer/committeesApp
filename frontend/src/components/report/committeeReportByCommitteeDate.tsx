@@ -8,6 +8,54 @@ import styles from "./CommitteeReportTable.module.css"; // Assume you create thi
 import { CommitteeRecord } from "./types";
 import { formatArabicDate } from "./utils";
 
+
+// ✅ Check if value is null, undefined, empty string, or "null"/"undefined" string
+const isEmptyValue = (value: any): boolean => {
+  return (
+    value === null || 
+    value === undefined || 
+    value === '' || 
+    value === 'null' || 
+    value === 'Null' || 
+    value === 'NULL' ||
+    value === 'undefined' ||
+    (typeof value === 'string' && value.trim() === '')
+  );
+};
+
+//  Safe display helper - returns "-" for empty values
+const safeDisplay = (value: any): string => {
+  return isEmptyValue(value) ? "-" : String(value);
+};
+
+// //  Updated formatDateSimple with null checking
+// const formatDateSimple = (dateString: string | null | undefined): string => {
+//   if (isEmptyValue(dateString)) return "-";
+  
+//   try {
+//     // If already in yyyy-MM-dd format, return as is
+//     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString!)) {
+//       return dateString!;
+//     }
+    
+//     // Parse and format to yyyy-MM-dd
+//     const date = new Date(dateString!);
+    
+//     // Check if date is valid
+//     if (isNaN(date.getTime())) {
+//       return "-";
+//     }
+    
+//     const year = date.getFullYear();
+//     const month = String(date.getMonth() + 1).padStart(2, '0');
+//     const day = String(date.getDate()).padStart(2, '0');
+    
+//     return `${year}-${month}-${day}`;
+//   } catch {
+//     return "-";
+//   }
+// };
+
 export default function CommitteePrintReportPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CommitteeRecord[]>([]);
@@ -46,21 +94,34 @@ export default function CommitteePrintReportPage() {
   const handlePrint = () => window.print();
   const cancelPrint = () => window.close();
 
-  const currentDate = new Date("2025-09-12").toLocaleDateString("ar-EG"); // Hardcoded as per prompt
+  const getCurrentDateSimple = (): string => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};
+
+
+const currentDate = getCurrentDateSimple();
 
   return (
     <div dir="rtl" className={`${styles.container} max-w-7xl mx-auto p-6 font-sans bg-white`}>
       <div className="flex items-center justify-between mb-6 w-full px-4">
         {/* Right: Title */}
-        <div>
-          <h1 className="text-2xl font-serif font-bold text-gray-800">إدارة اللجان</h1>
+        <div className="flex flex-col items-center">
+          <h1 className="text-2xl font-serif font-bold text-gray-800">شعبة الاجازات</h1>
+          <h1 className="text-2xl font-serif font-bold text-gray-800">تقرير اللجان</h1>
         </div>
         {/* Center: Report Title */}
         <div className="text-center">
           <h1 className="text-2xl font-serif font-bold text-gray-800">
             تقرير اللجان بين {formatArabicDate(committeeDate_from || "")} و {formatArabicDate(committeeDate_to || "")}
             <br />
-            <small>تاريخ التقرير: {currentDate}</small>
+             <small className="text-base text-gray-600">
+              تاريخ التقرير: <span dir="ltr">{currentDate}</span> 
+            </small>
           </h1>
         </div>
         {/* Left: Logo */}
@@ -100,7 +161,7 @@ export default function CommitteePrintReportPage() {
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[120px]">رئيس اللجنة</th>
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[80px]">عدد الأعضاء</th>
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[60px]">الجنس</th>
-                <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">عدد الجنس لكل لجنة</th>
+               
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[150px]">الملاحظات</th>
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">تاريخ الإنشاء</th>
                 {/* <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">المستخدم</th> */}
@@ -111,10 +172,12 @@ export default function CommitteePrintReportPage() {
                 <tr key={item.id} className="text-center even:bg-gray-100">
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2">{index + 1}</td>
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[80px] max-w-[100px] overflow-hidden text-ellipsis whitespace-wrap break-words">
-                    {item.committeeNo}
+                   {safeDisplay(item.committeeNo)}
                   </td>
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[112px]">
                     {formatArabicDate(item.committeeDate)}
+                         
+
                   </td>
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[150px] break-words">
                     {item.committeeTitle}
@@ -123,14 +186,12 @@ export default function CommitteePrintReportPage() {
                     {item.committeeBossName}
                   </td>
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[80px]">
-                    {item.committeeCount}
+                    {safeDisplay(item.committeeCount)}
                   </td>
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[60px]">
-                    {item.sex}
+                    {safeDisplay(item.sex)}
                   </td>
-                  <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[100px]">
-                    {item.sexCountPerCommittee}
-                  </td>
+                 
                   <td className="border border-gray-400 text-lg font-serif font-bold p-2 min-w-[150px] break-words whitespace-pre-wrap align-top">
                     {item.notes}
                   </td>

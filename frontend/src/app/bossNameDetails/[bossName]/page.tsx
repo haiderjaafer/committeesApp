@@ -1,8 +1,6 @@
-// 'use client';
-
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
-import { FileText, Calendar, User, Users } from 'lucide-react';
+import { FileText, Calendar, User } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{

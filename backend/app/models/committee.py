@@ -56,6 +56,35 @@ class CommitteeCreate(BaseModel):
         from_attributes = True
 
 
+class PDFResponse(BaseModel):
+    id: int
+    committeeID: int
+    committeeNo: Optional[str] = None
+    countPdf: Optional[int] = None
+    pdf: Optional[str] = None
+    currentDate: Optional[str] = None
+    userID: Optional[int] = None
+    username: Optional[str] = None
+    
+    @field_validator('currentDate', mode='before')
+    @classmethod
+    def convert_date_to_string(cls, value):
+        """Convert date objects to string format"""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+        if isinstance(value, date):
+            return value.strftime('%Y-%m-%d')
+        if isinstance(value, str):
+            return value
+        return str(value)
+
+    class Config:
+        from_attributes = True
+    
+
+#   Committee Response with PDFs
 class CommitteeResponse(BaseModel):
     id: Optional[int] = None
     committeeNo: Optional[str] = None
@@ -64,12 +93,13 @@ class CommitteeResponse(BaseModel):
     committeeBossName: Optional[str] = None
     sex: Optional[str] = None
     committeeCount: Optional[int] = None
-    # sexCountPerCommittee: Optional[int] = None
     notes: Optional[str] = None
     currentDate: Optional[str] = None
     userID: Optional[int] = None
     username: Optional[str] = None
-
+    pdfFiles: Optional[List[PDFResponse]] = []  # ✅ Added PDF files list
+    
+  
     @field_validator('committeeDate', 'currentDate', mode='before')
     @classmethod
     def convert_date_to_string(cls, value):

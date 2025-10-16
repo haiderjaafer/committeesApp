@@ -42,7 +42,7 @@ export default function BossNameReportFormSelection() {
 
 
 
-      const printUrl = `/print/bossNameReport?${queryString}`;
+      const printUrl = `/print/BossNameReport?${queryString}`;
       console.log("Opening print URL:", printUrl);
 
       const width = 1000;
@@ -110,7 +110,7 @@ export default function BossNameReportFormSelection() {
           className={`w-full py-3 px-6 rounded-md flex items-center justify-center gap-2 font-extrabold transition-colors font-arabic ${
             loading || !formData.bossName
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-orange-600 text-white hover:bg-orange-700 focus:ring-2 focus:ring-orange-500"
+              : "bg-cyan-600 text-white hover:bg-cyan-500 focus:ring-2 focus:ring-orange-500 cur"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

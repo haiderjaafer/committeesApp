@@ -332,7 +332,6 @@ class CommitteeService:
                     Committee.committeeBossName,
                     Committee.committeeCount,
                     Committee.sex,
-                    Committee.sexCountPerCommittee,
                     Committee.notes,
                     Committee.userID,
                     Committee.currentDate,
@@ -358,7 +357,6 @@ class CommitteeService:
                     "committeeBossName": row.committeeBossName,
                     "committeeCount": row.committeeCount,
                     "sex": row.sex,
-                    "sexCountPerCommittee": row.sexCountPerCommittee,
                     "notes": row.notes,
                     "currentDate": row.currentDate.strftime("%Y-%m-%d") if row.currentDate else None,
                     "userID": row.userID,
@@ -377,81 +375,84 @@ class CommitteeService:
 
     
     @staticmethod
-    async def getCommitteeWithPdfsByIDMethod(db: AsyncSession, id: int) -> CommitteeResponse:
-       
+    async def getCommitteeWithPdfsByIDMethod(
+        db: AsyncSession, 
+        id: int
+    ) -> CommitteeResponse:
+        """
+        Fetch committee with all associated PDFs and user information
+        """
         try:
-            # Fetch book, PDFs, and users in a single query
             result = await db.execute(
                 select(Committee, PDFTable, Users)
                 .outerjoin(PDFTable, Committee.id == PDFTable.committeeID)
-                
-                .outerjoin(Users, PDFTable.userID == Users.id)  # Join Users with PDFTable.userID
+                .outerjoin(Users, PDFTable.userID == Users.id)
                 .filter(Committee.id == id)
             )
             rows = result.fetchall()
             
             if not rows or not rows[0][0]:
-                logger.error(f"Committee ID {id} not found")
                 raise HTTPException(status_code=404, detail="Committee not found")
 
-            # Extract book, PDFs, user, committee, and department
-            book = rows[0][0]
-        
-            pdfs = [(row[1], row[2]) for row in rows if row[1]] or []  # Pair PDF with its user
+            committee = rows[0][0]
+            pdfs = [(row[1], row[2]) for row in rows if row[1]] or []
 
-            # Convert date fields to strings for book
-            ConvertedCommitteeDate = book.committeeDate.strftime('%Y-%m-%d') if isinstance(book.committeeDate, date) else book.committeeDate
+            # Convert committee dates
+            converted_committee_date = (
+                committee.committeeDate.strftime('%Y-%m-%d') 
+                if isinstance(committee.committeeDate, date) 
+                else committee.committeeDate
+            )
             
+            converted_current_date = (
+                committee.currentDate.strftime('%Y-%m-%d') 
+                if isinstance(committee.currentDate, date) 
+                else committee.currentDate
+            )
 
-            # Construct PDF responses
-            pdf_responses = [
+            # ✅ PDFResponse will handle date conversion automatically
+            pdf_responses: List[PDFResponse] = [
                 PDFResponse(
                     id=pdf.id,
                     committeeID=pdf.committeeID,
                     committeeNo=pdf.committeeNo,
+                    countPdf=pdf.countPdf,
                     pdf=pdf.pdf,
-                    currentDate=pdf.currentDate,
+                    currentDate=pdf.currentDate,  # ✅ Let Pydantic handle it
+                    userID=pdf.userID,
                     username=user.username if user else None
                 )
                 for pdf, user in pdfs
             ]
 
-            # Fetch the book owner's username separately if needed
-            book_user = None
-            if book.userID:
-                book_user_result = await db.execute(
-                    select(Users).filter(Users.id == book.userID)
+            # Fetch committee owner's username
+            committee_user = None
+            if committee.userID:
+                committee_user_result = await db.execute(
+                    select(Users).filter(Users.id == committee.userID)
                 )
-                book_user = book_user_result.scalars().first()
+                committee_user = committee_user_result.scalars().first()
 
-            # Construct response
-            CommitteeResponsedata = CommitteeResponse(
-                id= book.id,
-                committeeNo= book.committeeNo,
-                committeeDate= ConvertedCommitteeDate,
-                committeeTitle= book.committeeTitle,
-                committeeBossName= book.committeeBossName,
-                sex= book.sex,
-                committeeCount= book.committeeCount,
-                sexCountPerCommittee= book.sexCountPerCommittee,
-                notes= book.notes,
-                currentDate= book.currentDate,
-                userID= book.userID,
-                username=book_user.username if book_user else None,
-
-                
+            return CommitteeResponse(
+                id=committee.id,
+                committeeNo=committee.committeeNo,
+                committeeDate=converted_committee_date,
+                committeeTitle=committee.committeeTitle,
+                committeeBossName=committee.committeeBossName,
+                sex=committee.sex,
+                committeeCount=committee.committeeCount,
+                notes=committee.notes,
+                currentDate=converted_current_date,
+                userID=committee.userID,
+                username=committee_user.username if committee_user else None,
+                pdfFiles=pdf_responses
             )
-
-            logger.info(f"Fetched Committee ID {id} with {len(pdf_responses)} PDFs and username {CommitteeResponsedata.username}")
-            return CommitteeResponsedata
 
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error Committee  ID {id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") 
-
-
+            logger.error(f"Error fetching Committee ID {id}: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
     @staticmethod
@@ -497,7 +498,7 @@ class CommitteeService:
                 "committeeBossName": existing_record.committeeBossName,
                 "sex": existing_record.sex,
                 "committeeCount": existing_record.committeeCount,
-                "sexCountPerCommittee": existing_record.sexCountPerCommittee,
+              
                 "notes": existing_record.notes,
                 "currentDate": existing_record.currentDate.isoformat() if existing_record.currentDate else None,
                 "userID": existing_record.userID
@@ -624,7 +625,7 @@ class CommitteeService:
                 "committeeBossName": existing_record.committeeBossName,
                 "sex": existing_record.sex,
                 "committeeCount": existing_record.committeeCount,
-                "sexCountPerCommittee": existing_record.sexCountPerCommittee,
+              
                 "notes": existing_record.notes,
                 "currentDate": existing_record.currentDate.isoformat() if existing_record.currentDate else None,
                 "userID": existing_record.userID,

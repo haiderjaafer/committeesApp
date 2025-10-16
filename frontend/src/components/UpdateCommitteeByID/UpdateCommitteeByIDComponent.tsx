@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { FileText, Eye } from 'lucide-react';
+import { FileText, Eye, BookOpen } from 'lucide-react';
 import ArabicDatePicker from '../DatePicker/ArabicDatePicker';
 //import { JWTPayload } from '@/utiles/verifyToken';
 
@@ -382,6 +382,10 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
       );
     }
 
+
+  
+
+
     return (
       <div  className="mt-6">
         <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
@@ -652,7 +656,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
           </div>
 
           {/* Display PDFs */}
-          {renderPDFs}
+            {renderPDFs}  
 
           {/* Submit Button */}
           <div
@@ -672,3 +676,5 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
     </div>
   );
 }
+
+

@@ -460,8 +460,7 @@ async def updateRecordWithoutFile(
             update_data['sex'] = data['sex']
         if data.get('committeeCount') is not None:
             update_data['committeeCount'] = data['committeeCount']
-        if data.get('sexCountPerCommittee') is not None:
-            update_data['sexCountPerCommittee'] = data['sexCountPerCommittee']
+        
         if data.get('notes') is not None:
             update_data['notes'] = data['notes']
         if data.get('currentDate') is not None:
@@ -571,7 +570,7 @@ async def updateRecordWithFile(
     committeeBossName: Optional[str] = Form(None),
     sex: Optional[str] = Form(None),
     committeeCount: Optional[int] = Form(None),
-    sexCountPerCommittee: Optional[int] = Form(None),
+    
     notes: Optional[str] = Form(None),
     currentDate: Optional[date] = Form(None),
     userID: Optional[int] = Form(None),
@@ -608,7 +607,7 @@ async def updateRecordWithFile(
                 "committeeBossName": committeeBossName,
                 "sex": sex,
                 "committeeCount": committeeCount,
-                "sexCountPerCommittee": sexCountPerCommittee,
+    
                 "notes": notes,
                 "currentDate": currentDate,
                 "userID": userID
@@ -702,15 +701,13 @@ async def getCommitteesDetailsByBossNameReport(
 ) -> Dict[str, Any]:
     """
     Get committees report by boss name
-    Returns all committee fields for report generation
-    
-    Example: GET /api/committees/reportBasedOnBossName/رامي%20خالد%20مجيد%20الدلوي
+
     """
     try:
         logger.info(f"Fetching committees report for boss: {bossName}")
         
         # Decode URL-encoded boss name
-        decoded_boss_name = unquote(bossName)
+        decoded_boss_name = unquote(bossName)  # Replace %xx escapes by their single-character equivalent
         
         return await CommitteeService.getCommitteesDetailsByBossNameReport(db, decoded_boss_name)
         
