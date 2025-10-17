@@ -171,7 +171,7 @@ const RegisterForm: React.FC = () => {
           </h1>
 
           <p className="text-gray-600 mb-8 text-center">
-            اهلا وسهلا بكم في نظام متابعة الكتب الالكترونية
+            اهلا وسهلا بكم في نظام ارشفة اللجان الالكتروني
           </p>
 
           <form onSubmit={formSubmitHandler} className="space-y-6" noValidate>
@@ -325,7 +325,7 @@ const RegisterForm: React.FC = () => {
         <div className="hidden lg:block relative">
           <Image
             src="https://images.unsplash.com/photo-1527176930608-09cb256ab504?ixlib=rb-4.0.3&auto=format&fit=crop&w=1974&q=80"
-            alt="نظام متابعة الكتب الالكترونية"
+            alt="نظام نظام ارشفة اللجان الالكتروني"
             fill
             className="object-cover"
             sizes="(max-width: 1024px) 100vw, 50vw"
@@ -333,7 +333,7 @@ const RegisterForm: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
           <div className="absolute bottom-10 left-10 text-white p-4">
             <h2 className="text-3xl font-semibold mb-2">
-              نظام متابعة الكتب الالكترونية
+              نظام ارشفة اللجان الالكتروني
             </h2>
             <p className="text-lg">
               قسم تقنية المعلومات - شعبة الشبكات والانظمة البرمجية

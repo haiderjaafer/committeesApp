@@ -716,3 +716,27 @@ async def getCommitteesDetailsByBossNameReport(
     except Exception as e:
         logger.error(f"Error in getCommitteesDetailsByBossNameReport: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+    
+
+@committeesRouter.delete("/{id}", response_model=Dict[str, Any])
+async def deleteCommitteeWithPdfs(
+    id: int,
+    db: AsyncSession = Depends(get_async_db)
+) -> Dict[str, Any]:
+    """
+    Delete committee and all associated PDFs (from database and file system)
+    
+    Example: DELETE /api/committees/31
+    """
+    try:
+        logger.info(f"Attempting to delete committee ID: {id}")
+        
+        result = await CommitteeService.deleteCommitteeWithPdfsMethod(db, id)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in deleteCommitteeWithPdfs endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

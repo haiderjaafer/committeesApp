@@ -1,7 +1,8 @@
 from datetime import date, datetime
+import os
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import unquote
 from app.helper.save_pdf import save_pdf_to_server
@@ -242,6 +243,8 @@ class CommitteeService:
                     "userID": row.userID,
                     "username": row.username,
                     "pdfFiles": pdf_map.get(row.committeeNo, []),
+                    "pdfCount": len(pdf_map.get(row.committeeNo, []))
+
                 }
                 for i, row in enumerate(rows)  # Fixed: Iterate over rows
             ]
@@ -410,7 +413,7 @@ class CommitteeService:
                 else committee.currentDate
             )
 
-            # ✅ PDFResponse will handle date conversion automatically
+            #  PDFResponse will handle date conversion automatically
             pdf_responses: List[PDFResponse] = [
                 PDFResponse(
                     id=pdf.id,
@@ -418,7 +421,7 @@ class CommitteeService:
                     committeeNo=pdf.committeeNo,
                     countPdf=pdf.countPdf,
                     pdf=pdf.pdf,
-                    currentDate=pdf.currentDate,  # ✅ Let Pydantic handle it
+                    currentDate=pdf.currentDate,  #  Let Pydantic handle it
                     userID=pdf.userID,
                     username=user.username if user else None
                 )
@@ -905,3 +908,108 @@ class CommitteeService:
                 status_code=500,
                 detail=f"Database error: {str(e)}"
             )
+        
+
+    @staticmethod
+    async def deleteCommitteeWithPdfsMethod(
+        db: AsyncSession,
+        committee_id: int
+    ) -> Dict[str, Any]:
+        """
+        Delete committee and all associated PDFs from database and file system
+        """
+        try:
+            logger.info(f"Starting deletion process for committee ID: {committee_id}")
+            
+            # ✅ Step 1: Check if committee exists
+            committee_stmt = select(Committee).where(Committee.id == committee_id)
+            committee_result = await db.execute(committee_stmt)
+            committee = committee_result.scalar_one_or_none()
+            
+            if not committee:
+                logger.error(f"Committee ID {committee_id} not found")
+                raise HTTPException(status_code=404, detail="Committee not found")
+            
+            # Store committee info for response
+            committee_no = committee.committeeNo
+            committee_title = committee.committeeTitle
+            
+            # ✅ Step 2: Fetch all PDFs associated with this committee
+            pdf_stmt = select(PDFTable).where(PDFTable.committeeID == committee_id)
+            pdf_result = await db.execute(pdf_stmt)
+            pdfs = pdf_result.scalars().all()
+            
+            pdf_count = len(pdfs)
+            deleted_files = []
+            failed_files = []
+            
+            logger.info(f"Found {pdf_count} PDF files to delete for committee {committee_id}")
+            
+            # ✅ Step 3: Delete PDF files from file system
+            for pdf in pdfs:
+                if pdf.pdf:  # pdf.pdf is the file path
+                    file_path = pdf.pdf
+                    
+                    try:
+                        # Check if file exists
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            deleted_files.append({
+                                "id": pdf.id,
+                                "path": file_path,
+                                "committeeNo": pdf.committeeNo
+                            })
+                            logger.info(f"Successfully deleted file: {file_path}")
+                        else:
+                            logger.warning(f"File not found: {file_path}")
+                            failed_files.append({
+                                "id": pdf.id,
+                                "path": file_path,
+                                "reason": "File not found"
+                            })
+                    except Exception as e:
+                        logger.error(f"Failed to delete file {file_path}: {str(e)}")
+                        failed_files.append({
+                            "id": pdf.id,
+                            "path": file_path,
+                            "reason": str(e)
+                        })
+            
+            # ✅ Step 4: Delete PDF records from database
+            delete_pdf_stmt = delete(PDFTable).where(PDFTable.committeeID == committee_id)
+            await db.execute(delete_pdf_stmt)
+            logger.info(f"Deleted {pdf_count} PDF records from database")
+            
+            # ✅ Step 5: Delete committee record from database
+            await db.delete(committee)
+            
+            # ✅ Step 6: Commit all changes
+            await db.commit()
+            
+            logger.info(f"Successfully deleted committee ID {committee_id} with {pdf_count} PDFs")
+            
+            # ✅ Prepare response
+            return {
+                "success": True,
+                "message": f"Committee '{committee_title}' and all associated PDFs deleted successfully",
+                "details": {
+                    "committeeId": committee_id,
+                    "committeeNo": committee_no,
+                    "committeeTitle": committee_title,
+                    "totalPdfs": pdf_count,
+                    "filesDeleted": len(deleted_files),
+                    "filesFailed": len(failed_files),
+                    "deletedFiles": deleted_files,
+                    "failedFiles": failed_files if failed_files else None
+                }
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error deleting committee {committee_id}: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete committee: {str(e)}"
+            )    

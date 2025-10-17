@@ -1,7 +1,5 @@
 'use client';
-
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
@@ -45,7 +43,7 @@ interface CommitteeResponse {
   committeeBossName: string;
   sex: string;
   committeeCount: number;
-  sexCountPerCommittee: number;
+ 
   notes: string;
   currentDate: string;
   userID: number;
@@ -61,7 +59,7 @@ interface CommitteeFormType {
   committeeBossName: string;
   sex: string;
   committeeCount: number;
-  sexCountPerCommittee: number;
+ 
   notes: string;
   userID: string;
 }
@@ -115,7 +113,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
     committeeBossName: '',
     sex: '',
     committeeCount: 0,
-    sexCountPerCommittee: 0,
+   
     notes: '',
     userID: userID,
   });
@@ -137,7 +135,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
         committeeBossName: committee.committeeBossName || '',
         sex: committee.sex || '',
         committeeCount: committee.committeeCount || 0,
-        sexCountPerCommittee: committee.sexCountPerCommittee || 0,
+        
         notes: committee.notes || '',
         userID: userID,
       });
@@ -238,7 +236,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
         committeeBossName: 'اسم رئيس اللجنة',
         sex: 'الجنس',
         committeeCount: 'عدد اللجنة',
-        sexCountPerCommittee: 'عدد الجنس في اللجنة',
+        
         notes: 'الملاحظات',
         userID: 'المستخدم',
       };
@@ -304,7 +302,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
             committeeBossName: formData.committeeBossName,
             sex: formData.sex,
             committeeCount: formData.committeeCount,
-            sexCountPerCommittee: formData.sexCountPerCommittee,
+           
             notes: formData.notes || null,
             userID: parseInt(userID),
           };
@@ -603,24 +601,7 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
               />
             </div>
 
-            {/* Sex Count Per Committee */}
-            <div >
-              <label
-                htmlFor="sexCountPerCommittee"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
-                عدد الجنس في اللجنة
-              </label>
-              <input
-                id="sexCountPerCommittee"
-                name="sexCountPerCommittee"
-                type="number"
-                value={formData.sexCountPerCommittee}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                min="0"
-              />
-            </div>
+          
 
             {/* Notes */}
             <div  className="sm:col-span-2 lg:col-span-3">

@@ -26,31 +26,6 @@ interface ApiResponse {
   totalPages: number;
 }
 
-
-
-// Update CommitteeDataTable to include serialNo
-// interface CommitteeDataTable {
-//   serialNo: number;
-//   id: number;
-//   committeeNo: string;
-//   committeeDate: string | null;
-//   committeeTitle: string;
-//   committeeBossName: string;
-//   committeeCount: number;
-//   sex: string;
-//   sexCountPerCommittee: number;
-//   notes: string;
-//   currentDate: string | null;
-//   userID: number;
-//   username: string;
-//   pdfFiles: Array<{
-//     id: number;
-//     pdf: string;
-//     currentDate: string | null;
-//     username: string;
-//   }>;
-// }
-
 interface Filters {
   committeeNo: string;
   committeeTitle: string;
@@ -71,7 +46,7 @@ const SearchPanel = () => {
   const API_BASE_URL = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || "", []);
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20); // Match Postman test
+  const [limit, setLimit] = useState(20);
   const [pendingFilters, setPendingFilters] = useState<Filters>({
     committeeNo: "",
     committeeTitle: "",
@@ -91,7 +66,6 @@ const SearchPanel = () => {
   // Handle search
   const handleSearch = useCallback(() => {
     console.log("handleSearch triggered with pendingFilters:", pendingFilters);
-    // Validate date range
     if (pendingFilters.committeeDate_from && pendingFilters.committeeDate_to) {
       const startDate = new Date(pendingFilters.committeeDate_from);
       const endDate = new Date(pendingFilters.committeeDate_to);
@@ -167,21 +141,14 @@ const SearchPanel = () => {
         const endpoint = `${API_BASE_URL}/api/committees/getAllCommitteeNoBYQueryParams`;
         const params: Partial<Filters & { page: number; limit: number }> = { page, limit };
 
-        // Independent search based on filter type
         if (filterType !== "all") {
           if (filterType === "committeeDate_from" || filterType === "committeeDate_to") {
             if (activeFilters.committeeDate_from && activeFilters.committeeDate_to) {
               params.committeeDate_from = activeFilters.committeeDate_from;
               params.committeeDate_to = activeFilters.committeeDate_to;
-            } else {
-              console.log("No date range provided, fetching all records");
-              // Allow fetching all records when no date range is provided
             }
           } else if (activeFilters[filterType]) {
             params[filterType] = activeFilters[filterType];
-          } else {
-            console.log(`No value for ${filterType}, fetching all records`);
-            // Allow fetching all records when no filter value is provided
           }
         } else {
           Object.assign(params, queryParams);
@@ -236,11 +203,11 @@ const SearchPanel = () => {
     return "all";
   }, [activeFilters]);
 
-  // React Query
-  const { data, isLoading, error } = useQuery<ApiResponse>({
+  // ✅ UPDATED: React Query with refetch capability
+  const { data, isLoading, error, refetch } = useQuery<ApiResponse>({
     queryKey: queryKeys[activeFilterType],
     queryFn: () => fetchCommitteeData(activeFilterType),
-    enabled: true, // Always fetch, even with no filters
+    enabled: true,
     staleTime: 0,
     retry: 2,
     refetchOnWindowFocus: false,
@@ -263,20 +230,17 @@ const SearchPanel = () => {
     }
   }, []);
 
+  // ✅ FIXED: Refresh callback that triggers React Query refetch
+  const handleDataChange = useCallback(() => {
+    console.log('Refreshing committees data via refetch...');
+    refetch(); // ✅ This triggers React Query to refetch the data
+  }, [refetch]);
+
   // Error handling
   if (error) {
     console.error("Query error:", error);
     return <div className="text-red-500 text-center">Error loading data: {(error as Error).message}</div>;
   }
-
-  // Update orderHeaderMap to include serialNo
-  // const updatedHeaderMap = useMemo(
-  //   () => ({
-  //     ...orderHeaderMap,
-  //     serialNo: "الرقم التسلسلي",
-  //   }),
-  //   []
-  // );
 
   return (
     <div className="bg-white rounded-xl shadow-2xl p-6 font-arabic w-full max-w-full mx-auto text-right mt-3">
@@ -366,7 +330,7 @@ const SearchPanel = () => {
         ) : (
           <DynamicTable
             data={data?.data || []}
-            headerMap={HeaderMap} // Use updated header map with serialNo
+            headerMap={HeaderMap}
             excludeFields={["pdfFiles", "userID"]}
             pagination={{
               page: data?.page || 1,
@@ -376,6 +340,7 @@ const SearchPanel = () => {
               onPageChange: handlePageChange,
               onLimitChange: handleLimitChange,
             }}
+            onDataChange={handleDataChange} // ✅ Pass refetch callback
           />
         )}
       </AnimatePresence>
