@@ -2,7 +2,7 @@ from datetime import date, datetime
 import os
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request, UploadFile
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import unquote
 from app.helper.save_pdf import save_pdf_to_server
@@ -154,8 +154,8 @@ class CommitteeService:
                     end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
                     if start_date > end_date:
                         raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
-                    filters.append(Committee.committeeDate.isnot(None))
-                    filters.append(Committee.committeeDate.between(start_date, end_date))
+                    filters.append(Committee.currentDate.isnot(None))
+                    filters.append(Committee.currentDate.between(start_date, end_date))
                     logger.debug(f"Applying date range filter: {start_date} to {end_date}")
                 except ValueError as e:
                     logger.error(f"Invalid date format: {str(e)}")
@@ -173,28 +173,39 @@ class CommitteeService:
             offset = (page - 1) * limit
 
             # Fetch paginated records
+            
             query = (
-                select(
-                    Committee.id,
-                    Committee.committeeNo,
-                    Committee.committeeDate,
-                    Committee.committeeTitle,
-                    Committee.committeeBossName,
-                    Committee.committeeCount,
-                    
-                   
-                    Committee.notes,
-                    Committee.userID,
-                    Committee.currentDate,
-                    Users.username,
-                )
-                .outerjoin(Users, Committee.userID == Users.id)
-                .filter(*filters)
-                .distinct(Committee.committeeNo)
-                .order_by(Committee.committeeNo)
-                .offset(offset)
-                .limit(limit)
+            select(
+                Committee.id,
+                Committee.committeeNo,
+                Committee.committeeDate,
+                Committee.committeeTitle,
+                Committee.committeeBossName,
+                Committee.committeeCount,
+                Committee.notes,
+                Committee.userID,
+                Committee.currentDate,
+                Users.username,
             )
+            .outerjoin(Users, Committee.userID == Users.id)
+            .filter(*filters)
+            .group_by(
+                Committee.id,
+                Committee.committeeNo,
+                Committee.committeeDate,
+                Committee.committeeTitle,
+                Committee.committeeBossName,
+                Committee.committeeCount,
+                Committee.notes,
+                Committee.userID,
+                Committee.currentDate,
+                Users.username,
+            )
+            .order_by(desc(Committee.currentDate))
+            .offset(offset)
+            .limit(limit)
+        )
+    
             result = await db.execute(query)
             rows = result.fetchall()
 
@@ -318,8 +329,8 @@ class CommitteeService:
                     end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
                     if start_date > end_date:
                         raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
-                    filters.append(Committee.committeeDate.isnot(None))
-                    filters.append(Committee.committeeDate.between(start_date, end_date))
+                    filters.append(Committee.currentDate.isnot(None))
+                    filters.append(Committee.currentDate.between(start_date, end_date))
                     logger.debug(f"Applying date range filter: {start_date} to {end_date}")
                 except ValueError as e:
                     logger.error(f"Invalid date format: {str(e)}")
@@ -342,7 +353,20 @@ class CommitteeService:
                 )
                 .outerjoin(Users, Committee.userID == Users.id)
                
-                .filter(*filters)
+                .filter(*filters).group_by(
+                    Committee.id,
+                    Committee.committeeNo,
+                    Committee.committeeDate,
+                    Committee.committeeTitle,
+                    Committee.committeeBossName,
+                    Committee.committeeCount,
+                    Committee.sex,
+                    Committee.notes,
+                    Committee.userID,
+                    Committee.currentDate,
+                    Users.username,
+                    
+                )
                 .order_by(Committee.committeeDate)
             )
 
@@ -350,7 +374,8 @@ class CommitteeService:
             rows = result.fetchall()
 
             # Step 4: Format response
-            return [
+            data = [
+                
                 {
                 #    "serialNo": offset + i + 1,
                     "id": row.id,
@@ -367,6 +392,11 @@ class CommitteeService:
                 }
                 for row in rows
             ]
+
+            return {
+                "count": len(rows),  #   total count
+                "data": data         #   list of objects 
+            }
 
         except HTTPException:
             raise
@@ -910,106 +940,4 @@ class CommitteeService:
             )
         
 
-    @staticmethod
-    async def deleteCommitteeWithPdfsMethod(
-        db: AsyncSession,
-        committee_id: int
-    ) -> Dict[str, Any]:
-        """
-        Delete committee and all associated PDFs from database and file system
-        """
-        try:
-            logger.info(f"Starting deletion process for committee ID: {committee_id}")
-            
-            # ✅ Step 1: Check if committee exists
-            committee_stmt = select(Committee).where(Committee.id == committee_id)
-            committee_result = await db.execute(committee_stmt)
-            committee = committee_result.scalar_one_or_none()
-            
-            if not committee:
-                logger.error(f"Committee ID {committee_id} not found")
-                raise HTTPException(status_code=404, detail="Committee not found")
-            
-            # Store committee info for response
-            committee_no = committee.committeeNo
-            committee_title = committee.committeeTitle
-            
-            # ✅ Step 2: Fetch all PDFs associated with this committee
-            pdf_stmt = select(PDFTable).where(PDFTable.committeeID == committee_id)
-            pdf_result = await db.execute(pdf_stmt)
-            pdfs = pdf_result.scalars().all()
-            
-            pdf_count = len(pdfs)
-            deleted_files = []
-            failed_files = []
-            
-            logger.info(f"Found {pdf_count} PDF files to delete for committee {committee_id}")
-            
-            # ✅ Step 3: Delete PDF files from file system
-            for pdf in pdfs:
-                if pdf.pdf:  # pdf.pdf is the file path
-                    file_path = pdf.pdf
-                    
-                    try:
-                        # Check if file exists
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
-                            deleted_files.append({
-                                "id": pdf.id,
-                                "path": file_path,
-                                "committeeNo": pdf.committeeNo
-                            })
-                            logger.info(f"Successfully deleted file: {file_path}")
-                        else:
-                            logger.warning(f"File not found: {file_path}")
-                            failed_files.append({
-                                "id": pdf.id,
-                                "path": file_path,
-                                "reason": "File not found"
-                            })
-                    except Exception as e:
-                        logger.error(f"Failed to delete file {file_path}: {str(e)}")
-                        failed_files.append({
-                            "id": pdf.id,
-                            "path": file_path,
-                            "reason": str(e)
-                        })
-            
-            # ✅ Step 4: Delete PDF records from database
-            delete_pdf_stmt = delete(PDFTable).where(PDFTable.committeeID == committee_id)
-            await db.execute(delete_pdf_stmt)
-            logger.info(f"Deleted {pdf_count} PDF records from database")
-            
-            # ✅ Step 5: Delete committee record from database
-            await db.delete(committee)
-            
-            # ✅ Step 6: Commit all changes
-            await db.commit()
-            
-            logger.info(f"Successfully deleted committee ID {committee_id} with {pdf_count} PDFs")
-            
-            # ✅ Prepare response
-            return {
-                "success": True,
-                "message": f"Committee '{committee_title}' and all associated PDFs deleted successfully",
-                "details": {
-                    "committeeId": committee_id,
-                    "committeeNo": committee_no,
-                    "committeeTitle": committee_title,
-                    "totalPdfs": pdf_count,
-                    "filesDeleted": len(deleted_files),
-                    "filesFailed": len(failed_files),
-                    "deletedFiles": deleted_files,
-                    "failedFiles": failed_files if failed_files else None
-                }
-            }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"Error deleting committee {committee_id}: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to delete committee: {str(e)}"
-            )    
+    

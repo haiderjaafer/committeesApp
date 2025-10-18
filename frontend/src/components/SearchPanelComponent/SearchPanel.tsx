@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 
 const DynamicTable = dynamic(() => import("@/components/DynamicTableTanStack/DynamicTableWithPagination"), {
   ssr: false,
-  loading: () => <div>Loading table...</div>,
+  loading: () => <div>انتظر لتحميل البيانات...</div>,
 });
 
 interface ApiResponse {
@@ -331,7 +331,7 @@ const SearchPanel = () => {
           <DynamicTable
             data={data?.data || []}
             headerMap={HeaderMap}
-            excludeFields={["pdfFiles", "userID"]}
+            excludeFields={["pdfFiles", "userID","id"]}
             pagination={{
               page: data?.page || 1,
               limit: data?.limit || 20,

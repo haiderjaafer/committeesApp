@@ -55,7 +55,7 @@ const NAV_ITEMS: NavItem[] = [
       {
         title: 'تقرير الكتب',
         href: '/committeeReport',
-        description: 'تقرير كتب اللجنة   ',
+        description: ' تقرير كتب اللجنة حسب تأريخ الادخال ',
       },
       {
         title: ' تقرير الكتب حسب رئيس اللجنة',

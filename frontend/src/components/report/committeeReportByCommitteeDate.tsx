@@ -60,7 +60,7 @@ export default function CommitteePrintReportPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CommitteeRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [count ,setCount] = useState<number>(0);
   // Get query parameters
   const committeeDate_from = searchParams.get("committeeDate_from");
   const committeeDate_to = searchParams.get("committeeDate_to");
@@ -80,7 +80,9 @@ export default function CommitteePrintReportPage() {
         if (!res.ok) throw new Error("Failed to fetch report");
         const result = await res.json();
         console.log("result..." + result);
-        setData(result || []);
+        setData(result.data || []);
+        setCount(result.count || 0);
+
       } catch (error) {
         console.error("Error fetching committee report data:", error);
       } finally {
@@ -163,7 +165,7 @@ const currentDate = getCurrentDateSimple();
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[60px]">الجنس</th>
                
                 <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[150px]">الملاحظات</th>
-                <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">تاريخ الإنشاء</th>
+                <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">تاريخ الادخال</th>
                 {/* <th className="border border-gray-400 p-2 text-lg font-extrabold min-w-[100px]">المستخدم</th> */}
               </tr>
             </thead>
@@ -204,6 +206,20 @@ const currentDate = getCurrentDateSimple();
                 </tr>
               ))}
             </tbody>
+       <tfoot>
+  <tr className="bg-gray-300">
+    <td className="border border-gray-400 text-lg font-extrabold text-center p-2">
+      المجموع 
+    </td>
+    <td
+      colSpan={1}
+      className="border border-gray-400 text-lg font-extrabold text-center p-2"
+    >
+      {count}
+    </td>
+  </tr>
+</tfoot>
+
           </table>
         </div>
       )}

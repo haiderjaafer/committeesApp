@@ -15,7 +15,7 @@ from fastapi import APIRouter
 from app.database.config import settings
 from app.helper.save_pdf import save_pdf_to_server
 from app.models.PDFTable import DeletePDFRequest, PDFCreate, PDFResponse, PDFTable
-from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
+from app.models.committee import Committee, CommitteeCreate, CommitteeListResponse, CommitteeResponse
 from app.models.committeeSearch import AutoSuggestionRequest, AutoSuggestionResponse, CommitteeBossNameResponse, CommitteeNoResponse, CommitteeSearchRequest, CommitteeSearchResponse, CommitteeTitleResponse
 from app.models.users import Users
 from app.services.committee import CommitteeService
@@ -174,6 +174,8 @@ async def search_committees_get(
         logger.error(f"Search committees GET error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+#check if not used delete it
 @committeesRouter.get("/suggestions/titles", response_model=AutoSuggestionResponse)
 async def get_title_suggestions(
     q: str = Query(..., min_length=1, max_length=100, description="Search query"),
@@ -190,6 +192,8 @@ async def get_title_suggestions(
         logger.error(f"Title suggestions error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+#check if not used delete it
 @committeesRouter.get("/suggestions/boss-names", response_model=AutoSuggestionResponse)
 async def get_boss_name_suggestions(
     q: str = Query(..., min_length=1, max_length=100, description="Search query"),
@@ -284,7 +288,7 @@ async def getByFilterBooksNo(
     )
 
 
-
+# check this what do
 @committeesRouter.get("/pdf/{committeeNo}", response_model=List[PDFResponse])
 async def get_pdfs_by_book_no(committeeNo: str, db: AsyncSession = Depends(get_async_db)):
     print(f"Fetching PDFs for bookNo: {committeeNo}")
@@ -300,6 +304,7 @@ async def get_pdfs_by_book_no(committeeNo: str, db: AsyncSession = Depends(get_a
             )
             .outerjoin(Users, PDFTable.userID == Users.id)
             .filter(PDFTable.committeeNo == committeeNo)
+            .order_by(PDFTable.currentDate)
         )
         # print("Executing query...")
         result = await db.execute(query)
@@ -332,7 +337,7 @@ async def get_pdfs_by_book_no(committeeNo: str, db: AsyncSession = Depends(get_a
 
 
 
-@committeesRouter.get("/pdf/file/{pdf_id}")
+@committeesRouter.get("/pdf/file/{pdf_id}" ,description='serve/show pdf by pdf id')
 async def get_pdf_file(pdf_id: int, db: AsyncSession = Depends(get_async_db)):
 
     """
@@ -402,8 +407,7 @@ async def getCommitteeCountsRoute(db: AsyncSession = Depends(get_async_db)):
   
 
 
-
-@committeesRouter.get("/report", response_model=List[CommitteeResponse])
+@committeesRouter.get("/report", response_model=CommitteeListResponse)
 async def committeeReportFunction(
     committeeDate_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     committeeDate_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
@@ -493,72 +497,7 @@ async def updateRecordWithoutFile(
             detail=f"Server error: {str(e)}"
         )    
     
-# # without file
-# @committeesRouter.patch("/{id}/json", response_model=Dict[str, Any])
-# async def updateRecordWithoutFile(
-#     id: int,
-#     committeeNo: Optional[str] = Form(None),
-#     committeeDate: Optional[date] = Form(None),
-#     committeeTitle: Optional[str] = Form(None),
-#     committeeBossName: Optional[str] = Form(None),
-#     sex: Optional[str] = Form(None),
-#     committeeCount: Optional[int] = Form(None),
-#     sexCountPerCommittee: Optional[int] = Form(None),
-#     notes: Optional[str] = Form(None),
-#     currentDate: Optional[date] = Form(None),
-#     userID: Optional[int] = Form(None),
-#     db: AsyncSession = Depends(get_async_db)
-# ):
-#     """
-#     Update a committee record by ID (without file upload)
-#     Content-Type: multipart/form-data (but no file)
-#     """
-#     try:
-#         print(f"Route (No File) - Updating record ID: {id}")
-        
-#         # Build update dictionary
-#         update_data = {
-#             k: v for k, v in {
-#                 "committeeNo": committeeNo,
-#                 "committeeDate": committeeDate,
-#                 "committeeTitle": committeeTitle,
-#                 "committeeBossName": committeeBossName,
-#                 "sex": sex,
-#                 "committeeCount": committeeCount,
-#                 "sexCountPerCommittee": sexCountPerCommittee,
-#                 "notes": notes,
-#                 "currentDate": currentDate,
-#                 "userID": userID
-#             }.items() if v is not None
-#         }
-        
-#         # Validate that there's data to update
-#         if not update_data:
-#             raise HTTPException(
-#                 status_code=400,
-#                 detail="No fields provided for update"
-#             )
-        
-#         # Call service method without file
-#         updated_record = await CommitteeService.UpdateRecordWithoutFile(
-#             db, 
-#             id, 
-#             update_data
-#         )
-        
-#         return {
-#             "success": True,
-#             "message": "Record updated successfully",
-#             "data": updated_record
-#         }
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=f"Server error: {str(e)}"
-#         )    
-    
+   
 
 # with file
 @committeesRouter.patch("/{id}", response_model=Dict[str, Any])
@@ -718,7 +657,7 @@ async def getCommitteesDetailsByBossNameReport(
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
     
 
-@committeesRouter.delete("/{id}", response_model=Dict[str, Any])
+@committeesRouter.delete("/{id}", response_model=Dict[str, Any], description='delete all pdf file by committee id')
 async def deleteCommitteeWithPdfs(
     id: int,
     db: AsyncSession = Depends(get_async_db)
@@ -731,7 +670,7 @@ async def deleteCommitteeWithPdfs(
     try:
         logger.info(f"Attempting to delete committee ID: {id}")
         
-        result = await CommitteeService.deleteCommitteeWithPdfsMethod(db, id)
+        result = await PDFService.deleteCommitteeWithPdfsMethod(db, id)
         
         return result
         

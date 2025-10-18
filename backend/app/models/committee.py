@@ -15,7 +15,6 @@ class Committee(Base):
     committeeBossName = Column(Unicode(100), nullable=True)
     sex = Column(Unicode(10), nullable=True)
     committeeCount = Column(Integer, nullable=True)
-    # sexCountPerCommittee= Column(Integer, nullable=True)
     notes = Column(Unicode(500), nullable=True)
     currentDate = Column(Date, nullable=True)
     userID = Column(Integer, nullable=True)
@@ -32,7 +31,6 @@ class CommitteeCreate(BaseModel):
     committeeBossName:Optional[str] = None
     sex : Optional[str] =None
     committeeCount:Optional[int] = None
-    # sexCountPerCommittee:Optional[int] = None
     notes: Optional[str] = None
     currentDate: Optional[str] = None
     userID: Optional[int] = None
@@ -97,7 +95,7 @@ class CommitteeResponse(BaseModel):
     currentDate: Optional[str] = None
     userID: Optional[int] = None
     username: Optional[str] = None
-    pdfFiles: Optional[List[PDFResponse]] = []  # ✅ Added PDF files list
+    pdfFiles: Optional[List[PDFResponse]] = []  #   PDF files list
     
   
     @field_validator('committeeDate', 'currentDate', mode='before')
@@ -114,6 +112,13 @@ class CommitteeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+
+class CommitteeListResponse(BaseModel):    # class CommitteeListResponse will be used in report route
+    count: int                      # int count - length
+    data: List[CommitteeResponse]   # list of objects from return of service method
+
 
 
 class PaginatedCommittees(BaseModel):
