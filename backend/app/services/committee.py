@@ -8,6 +8,8 @@ from urllib.parse import unquote
 from app.helper.save_pdf import save_pdf_to_server
 from app.models.PDFTable import PDFCreate, PDFResponse, PDFTable
 from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
+from app.models.employee import Employee
+from app.models.junction_committee_employee import JunctionCommitteeEmployee
 from app.models.users import Users
 import logging
 from app.database.config import settings
@@ -26,12 +28,70 @@ if not logger.handlers:  # Avoid duplicate handlers
 
 class CommitteeService:
     @staticmethod
-    async def insertCommitteesDocsData(db: AsyncSession, CommitteeCreateArgs:CommitteeCreate ) -> int:
-        newCommitteeObject = Committee(**CommitteeCreateArgs.model_dump())
-        db.add(newCommitteeObject)
-        await db.commit()
-        await db.refresh(newCommitteeObject)
-        return newCommitteeObject.id
+    async def insertCommitteesDocsData(
+        db: AsyncSession, 
+        committeeCreateArgs: CommitteeCreate,
+        userID: int
+    ) -> int:
+        """
+        Insert new committee and link employees as members
+        
+        Steps:
+        1. Create committee record
+        2. Link employees to committee via junction table
+        3. Return new committee ID
+        """
+        try:
+            # Step 1: Create committee record
+            logger.info(f"Creating committee: {committeeCreateArgs.committeeNo}")
+            
+            # Extract employee IDs before creating committee
+            employee_ids = committeeCreateArgs.employeeIDs or []
+            
+            # Create committee dict without employeeIDs
+            committee_data = committeeCreateArgs.model_dump(exclude={'employeeIDs'})
+            new_committee = Committee(**committee_data)
+            
+            db.add(new_committee)
+            await db.flush()  #  Flush to get ID without committing
+            
+            logger.info(f"Committee created with ID: {new_committee.id}")
+            
+            # Step 2: Link employees to committee
+            if employee_ids:
+                logger.info(f"Adding {len(employee_ids)} employees to committee {new_committee.id}")
+                
+                for emp_id in employee_ids:
+                    # Verify employee exists
+                    emp_stmt = select(Employee).where(Employee.empID == emp_id)
+                    emp_result = await db.execute(emp_stmt)
+                    employee = emp_result.scalar_one_or_none()
+                    
+                    if not employee:
+                        logger.warning(f"Employee ID {emp_id} not found, skipping")
+                        continue
+                    
+                    # Create junction record
+                    junction_record = JunctionCommitteeEmployee(
+                        committeeID=new_committee.id,
+                        empID=emp_id,
+                        createdBy=userID
+                    )
+                    db.add(junction_record)
+                    logger.info(f"Added employee {employee.name} (ID: {emp_id}) to committee")
+            
+            # Step 3: Commit transaction
+            await db.commit()
+            await db.refresh(new_committee)
+            
+            logger.info(f"Successfully created committee {new_committee.id} with {len(employee_ids)} members")
+            
+            return new_committee.id
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error creating committee: {str(e)}", exc_info=True)
+            raise
     
 
     
