@@ -18,6 +18,9 @@ from app.routes.committees import committeesRouter
 # from app.routes.authentication import router
 from app.routes.authentication import router
 
+from app.routes.employees import employeesRouter  
+
+
 
 
 @asynccontextmanager
@@ -66,6 +69,8 @@ def create_app() -> FastAPI:              #create_app() just defines a factory f
     #  Register routers
     app.include_router(committeesRouter)
     app.include_router(router)
+    app.include_router(employeesRouter)  
+
 
     return app
 

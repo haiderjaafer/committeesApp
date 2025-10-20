@@ -1,4 +1,3 @@
-
 from datetime import datetime,date
 import logging
 import os
@@ -22,6 +21,8 @@ from app.services.committee import CommitteeService
 from app.services.committeeSearch import CommitteeSearchService, get_committee_search_service
 from app.services.pdf import PDFService
 from urllib.parse import unquote
+import json
+
 
 
 committeesRouter = APIRouter(prefix="/api/committees", tags=["COMMITTEES"])
@@ -39,81 +40,128 @@ async def test_path():
     }
 
 
-@committeesRouter.post("/post")
-async def addCommitteeDoc( 
+@committeesRouter.post("/post", response_model=dict)
+async def addCommitteeDoc(
+    # Step 1: Receive form data
     committeeNo: str = Form(...),
     committeeDate: str = Form(...),
     committeeTitle: str = Form(...),
     committeeBossName: str = Form(...),
-    sex: Optional[str] = Form(None),  #  Changed from Form(...) to Form(None)
-    committeeCount: Optional[int] = Form(None),  #  Changed from Form(...) to Form(None)
-    notes: Optional[str] = Form(None),  #  Changed from Form(...) to Form(None)
+    sex: Optional[str] = Form(None),
+    committeeCount: Optional[int] = Form(None),
+    notes: Optional[str] = Form(None),
     userID: str = Form(...),
-    file: UploadFile = File(...),  #  Changed from Form(...) to File(...)
+    #  NEW: Receive employee IDs as JSON string
+    employeeIDs: Optional[str] = Form("[]"),  # Default empty array as string
+    file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Add a new committee with PDF file
+    Add a new committee with PDF file and employee members
+    
+    Steps:
+    1. Validate and parse input data
+    2. Create committee record
+    3. Link employees to committee
+    4. Save PDF file
+    5. Create PDF record
+    6. Return success response
+    
     Required fields: committeeNo, committeeDate, committeeTitle, committeeBossName, userID, file
-    Optional fields: sex, committeeCount, notes
+    Optional fields: sex, committeeCount, notes, employeeIDs
+    
+    employeeIDs format: JSON array string, e.g., "[1, 2, 3]"
     """
-    try: 
-        committeesDocsData = CommitteeCreate(
+    try:
+        # Step 1: Parse employee IDs from JSON string
+        logger.info(f"Creating committee {committeeNo} with members")
+        
+        try:
+            employee_id_list = json.loads(employeeIDs) if employeeIDs else []
+            if not isinstance(employee_id_list, list):
+                raise ValueError("employeeIDs must be an array")
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid employeeIDs format. Expected JSON array string like '[1,2,3]'"
+            )
+        
+        logger.info(f"Parsed employee IDs: {employee_id_list}")
+        
+        # Step 2: Create committee data schema
+        committee_data = CommitteeCreate(
             committeeNo=committeeNo,
             committeeDate=committeeDate,
             committeeTitle=committeeTitle,
             committeeBossName=committeeBossName,
-            sex=sex,  #  Can be None now
+            sex=sex,
             committeeCount=committeeCount,
             notes=notes,
             currentDate=datetime.today().strftime('%Y-%m-%d'),
-            userID=userID
+            userID=int(userID),
+            employeeIDs=employee_id_list  #  Include employee IDs
         )
         
-        # Insert committee record
-        newCommiteeID = await CommitteeService.insertCommitteesDocsData(db, committeesDocsData)
-        print(f"Inserted committee with ID: {newCommiteeID}")
-        print(f"Committee data: {committeesDocsData}")
-
-        # Count PDFs
-        count = await PDFService.get_pdf_count(db, newCommiteeID)
-        print(f"PDF count for new Committee record {newCommiteeID}: {count}")
-
-        # Save file
+        # Step 3: Insert committee record and link employees
+        new_committee_id = await CommitteeService.insertCommitteesDocsData(
+            db, 
+            committee_data,
+            userID=int(userID)
+        )
+        logger.info(f"Created committee with ID: {new_committee_id}")
+        
+        # Step 4: Count existing PDFs for this committee
+        pdf_count = await PDFService.get_pdf_count(db, new_committee_id)
+        logger.info(f"PDF count for committee {new_committee_id}: {pdf_count}")
+        
+        # Step 5: Save PDF file to server
         upload_dir = settings.PDF_UPLOAD_PATH
         with file.file as f:
-            pdf_path = save_pdf_to_server(f, committeeNo, committeeDate, count, upload_dir)
-        print(f"Saved PDF to: {pdf_path}")
-
+            pdf_path = save_pdf_to_server(
+                f, 
+                committeeNo, 
+                committeeDate, 
+                pdf_count, 
+                upload_dir
+            )
+        logger.info(f"Saved PDF to: {pdf_path}")
+        
         # Close upload stream
         file.file.close()
-
-        # Insert PDF record
+        
+        # Step 6: Insert PDF record to database
         pdf_data = PDFCreate(
-            committeeID=newCommiteeID,
+            committeeID=new_committee_id,
             committeeNo=committeeNo,
             committeeDate=committeeDate,
-            countPdf=count + 1,  #  Increment count
+            countPdf=pdf_count + 1,
             pdf=pdf_path,
             userID=int(userID),
             currentDate=datetime.now().date().isoformat()
         )
-        print(f"Inserting PDF record: {pdf_data}")
         await PDFService.insert_pdf(db, pdf_data)
-        print(f"Successfully inserted PDF record")
-
+        logger.info(f"PDF record inserted successfully")
+        
+        # Step 7: Return success response
         return {
             "success": True,
-            "message": "Committee and PDF added successfully",
-            "id": newCommiteeID,
-            "count": count + 1
+            "message": f"تم إضافة اللجنة '{committeeTitle}' بنجاح مع {len(employee_id_list)} عضو",
+            "data": {
+                "committeeID": new_committee_id,
+                "committeeNo": committeeNo,
+                "pdfCount": pdf_count + 1,
+                "memberCount": len(employee_id_list)
+            }
         }
-
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ Error in addCommitteeDoc: {str(e)}")
         logger.error(f"Error in addCommitteeDoc: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
-
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Server error: {str(e)}"
+        )
 
 @committeesRouter.get("/lastCommitteeNo")
 async def getLastCommitteeNo(db: AsyncSession = Depends(get_async_db)):

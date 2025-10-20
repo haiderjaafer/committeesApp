@@ -1,14 +1,15 @@
-from sqlalchemy import Column, Integer, String, Date,Unicode
+from sqlalchemy import Column, Integer, String, Date,Unicode,BigInteger
 from app.database.database import Base
 from pydantic import BaseModel, field_validator, validator
 from datetime import date, datetime
 from typing import List, Optional
-
+from sqlalchemy.orm import relationship
 
 
 class Committee(Base):
     __tablename__ = "committee"
-    id = Column(Integer, primary_key=True, index=True)
+    
+    id = Column(BigInteger, primary_key=True, index=True)
     committeeNo = Column(Unicode(255), nullable=False)
     committeeDate = Column(Date, nullable=True)
     committeeTitle = Column(Unicode, nullable=True)
@@ -17,8 +18,15 @@ class Committee(Base):
     committeeCount = Column(Integer, nullable=True)
     notes = Column(Unicode(500), nullable=True)
     currentDate = Column(Date, nullable=True)
-    userID = Column(Integer, nullable=True)
-
+    userID = Column(Integer,  nullable=True)
+    
+    
+    #Relationship to junction table (committee members)
+    committee_members = relationship(
+        "JunctionCommitteeEmployee",
+        back_populates="committee",
+        cascade="all, delete-orphan"
+    )
 
 
 
@@ -34,6 +42,7 @@ class CommitteeCreate(BaseModel):
     notes: Optional[str] = None
     currentDate: Optional[str] = None
     userID: Optional[int] = None
+    employeeIDs: Optional[List[int]] = []
    
 
     @field_validator('committeeDate', 'currentDate')

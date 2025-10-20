@@ -206,19 +206,25 @@ const currentDate = getCurrentDateSimple();
                 </tr>
               ))}
             </tbody>
-       <tfoot>
+<tfoot>
   <tr className="bg-gray-300">
-    <td className="border border-gray-400 text-lg font-extrabold text-center p-2">
-      المجموع 
-    </td>
+   
     <td
-      colSpan={1}
+      colSpan={8}
+      className="border border-gray-400 text-lg font-extrabold text-center p-2"
+    >
+      المجموع
+    </td>
+
+    
+    <td
       className="border border-gray-400 text-lg font-extrabold text-center p-2"
     >
       {count}
     </td>
   </tr>
 </tfoot>
+
 
           </table>
         </div>
