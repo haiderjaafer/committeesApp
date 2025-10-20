@@ -108,7 +108,7 @@ async def getAllEmployees(
     
 
 
-@employeesRouter.get("/getEmployeeByID/{emp_id}", response_model=dict)
+@employeesRouter.get("/{emp_id}", response_model=dict)
 async def getEmployee(
     # Step 1: Accept employee ID
     emp_id: int,

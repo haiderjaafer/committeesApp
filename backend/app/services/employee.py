@@ -139,37 +139,64 @@ class EmployeeService:
     async def autocompleteEmployeeName(
         db: AsyncSession,
         query: str,
-        limit: int = 10
+        limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Fast autocomplete for employee names"""
+        """
+        Smart autocomplete:
+        1. If numeric: EXACT match on employee_desc
+        2. If text: Sequential word match (starts with pattern)
+        
+        Examples:
+        - "1022" → only employee_desc = 1022
+        - "زهراء حازم" → names starting with "زهراء حازم"
+        - "زهراء" → names starting with "زهراء"
+        """
         try:
             if not query or not query.strip():
                 return []
             
             search_term = query.strip()
-            
             logger.info(f"Autocomplete search: '{search_term}'")
             
-            # Step 1: Build query with LTRIM(RTRIM()) for SQL Server
-            stmt = (
-                select(Employee)
-                .where(func.ltrim(func.rtrim(Employee.name)).like(f"%{search_term}%"))
-                .order_by(Employee.name.asc())
-                .limit(limit)
-            )
+            # Step 1: Check if search is numeric (employee_desc)
+            if search_term.isdigit():
+                logger.info(f"Searching for exact employee_desc: {search_term}")
+                
+                # ✅ EXACT match only
+                stmt = (
+                    select(Employee)
+                    .where(Employee.employee_desc == int(search_term))
+                    .limit(limit)
+                )
+            else:
+                # Step 2: Text search - Sequential word match
+                logger.info(f"Searching for name starting with: '{search_term}'")
+                
+                # ✅ Use LIKE with pattern at START of name
+                # This matches names that BEGIN with the search pattern
+                stmt = (
+                    select(Employee)
+                    .where(
+                        func.ltrim(func.rtrim(Employee.name)).like(f"{search_term}%")
+                    )
+                    .order_by(Employee.name.asc())
+                    .limit(limit)
+                )
             
-            # Step 2: Execute query
+            # Step 3: Execute query
             result = await db.execute(stmt)
             employees = result.scalars().all()
             
             logger.info(f"Autocomplete found {len(employees)} results")
             
-            # Step 3: Return results
+            # Step 4: Format response
             return [
                 {
                     "empID": emp.empID,
                     "name": emp.name,
-                    "employee_desc": emp.employee_desc
+                    "employee_desc": emp.employee_desc,
+                    "gender": emp.gender,
+                    "genderName": "ذكر" if emp.gender == 1 else "أنثى" if emp.gender == 2 else None
                 }
                 for emp in employees
             ]
