@@ -475,7 +475,7 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
             />
           </div>
 
-          {/* ✅ Display Selected Employees */}
+          {/*  Display Selected Employees */}
           {selectedEmployeeIDs.length > 0 && (
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
               <div className="flex items-center justify-between mb-3">
@@ -512,24 +512,32 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
                       className="bg-white border border-blue-200 rounded-lg p-3 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                        <div className="">
+                          {/* <div className="flex items-center gap-2 mb-2">
                             <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                               {index + 1}
                             </span>
-                          </div>
+                          </div> */}
 
-                          <div className="flex items-start gap-2 mb-2">
+                          <div className="flex  gap-2 mb-2">
                             <User className="h-4 w-4 text-blue-600 mt-0.5" />
                             <div className="flex-1">
-                              <p className="text-xs text-gray-500 font-arabic">الاسم</p>
+                              {/* <p className="text-xs text-gray-500 font-arabic">الاسم</p> */}
                               <p className="text-sm font-bold font-arabic text-gray-800">
                                 {employee.name}
                               </p>
                             </div>
+                              <div className="flex  gap-1">
+                              {/* <Hash className="h-3 w-3 text-purple-600" /> */}
+                              {/* <span className="text-xs text-gray-500">رقم: </span> */}
+                              <span className="text-xs font-bold text-purple-600">
+                                {employee.employee_desc}
+                              </span>
+                            </div>
+
                           </div>
 
-                          <div className="flex items-center gap-4">
+                          {/* <div className="flex items-center gap-4">
                             <div className="flex items-center gap-1">
                               <Hash className="h-3 w-3 text-green-600" />
                               <span className="text-xs text-gray-500">ID: </span>
@@ -537,20 +545,14 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
                                 {employee.empID}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Hash className="h-3 w-3 text-purple-600" />
-                              <span className="text-xs text-gray-500">رقم: </span>
-                              <span className="text-xs font-bold text-purple-600">
-                                {employee.employee_desc}
-                              </span>
-                            </div>
-                          </div>
+                         
+                          </div> */}
 
-                          {employee.genderName && (
+                          {/* {employee.genderName && (
                             <span className="text-xs bg-gray-200 px-2 py-1 rounded mt-2 inline-block font-arabic">
                               {employee.genderName}
                             </span>
-                          )}
+                          )} */}
                         </div>
 
                         <button
@@ -596,7 +598,8 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
                   جاري الحفظ...
                 </>
               ) : (
-                `حفظ الكتاب ${selectedEmployeeIDs.length > 0 ? `(${selectedEmployeeIDs.length} عضو)` : ''}`
+                // `حفظ الكتاب ${selectedEmployeeIDs.length > 0 ? `(${selectedEmployeeIDs.length} عضو)` : ''}`
+                "حفظ الكتاب"
               )}
             </Button>
           </div>
