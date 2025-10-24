@@ -1,10 +1,14 @@
 # services/employee_service.py
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_, cast, String
+from app.models.committee import Committee
 from app.models.employee import EmployeeSearchParams
 from  app.models.employee import Employee
 from typing import List, Dict, Any
 import logging
+
+from app.models.junction_committee_employee import JunctionCommitteeEmployee
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +245,73 @@ class EmployeeService:
         except Exception as e:
             logger.error(f"Error getting all employees: {str(e)}", exc_info=True)
             raise
+
+
+
+    @staticmethod
+    async def getCommitteeEmployeesMethod(
+        db: AsyncSession,
+        committee_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch all employees for a specific committee
+        
+        Args:
+            db: Database session
+            committee_id: Committee ID
+        
+        Returns:
+            List of employees with their details
+        """
+        try:
+            logger.info(f"Fetching employees for committee ID: {committee_id}")
+            
+            # Step 1: Check if committee exists
+            committee_stmt = select(Committee).where(Committee.id == committee_id)
+            committee_result = await db.execute(committee_stmt)
+            committee = committee_result.scalar_one_or_none()
+            
+            if not committee:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Committee with ID {committee_id} not found"
+                )
+            
+            # Step 2: Fetch employees for this committee
+            employees_stmt = (
+                select(Employee)
+                .join(
+                    JunctionCommitteeEmployee,
+                    Employee.empID == JunctionCommitteeEmployee.empID
+                )
+                .filter(JunctionCommitteeEmployee.committeeID == committee_id)
+                .order_by(Employee.name.asc())
+            )
+            
+            employees_result = await db.execute(employees_stmt)
+            employees = employees_result.scalars().all()
+            
+            logger.info(f"Found {len(employees)} employees for committee {committee_id}")
+            
+            # Step 3: Format response
+            formatted_employees = [
+                {
+                    "empID": emp.empID,
+                    "name": emp.name,
+                    "employee_desc": emp.employee_desc,
+                    "gender": emp.gender,
+                    "genderName": "ذكر" if emp.gender == 1 else "أنثى" if emp.gender == 2 else None
+                }
+                for emp in employees
+            ]
+            
+            return formatted_employees
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching employees for committee {committee_id}: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error: {str(e)}"
+            )

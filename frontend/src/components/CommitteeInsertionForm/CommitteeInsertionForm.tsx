@@ -454,14 +454,14 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
                 value={formData.notes}
                 onChange={handleChange}
                 placeholder="الملاحظات"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right resize-y"
+                className="w-full px-4 py-2 border   border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right resize-y"
                 rows={4}
                 autoComplete="off"
               />
             </div>
           </div>
 
-          {/* ✅ Employee Selection Dialog */}
+          {/*  Employee Selection Dialog */}
           <div className="mt-6">
             <label className="block text-sm font-extrabold text-gray-700 mb-2 text-right">
               أعضاء اللجنة
@@ -471,13 +471,13 @@ export default function CommitteeInsertionForm({ payload }: CommitteeInsertionFo
               onEmployeesSelected={handleEmployeesSelected}
               maxSelections={50}
               triggerButtonText="اختيار أعضاء اللجنة"
-              triggerButtonClassName="w-full h-12 text-base"
+              triggerButtonClassName="w-full h-12 text-base bg-gray-400 hover:bg-gray-500 "
             />
           </div>
 
           {/*  Display Selected Employees */}
           {selectedEmployeeIDs.length > 0 && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+            <div dir='rtl' className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 h-[300px] overflow-y-scroll scroll-smooth">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-blue-600" />

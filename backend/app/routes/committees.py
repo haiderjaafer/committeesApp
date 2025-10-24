@@ -17,7 +17,7 @@ from app.models.PDFTable import DeletePDFRequest, PDFCreate, PDFResponse, PDFTab
 from app.models.committee import Committee, CommitteeCreate, CommitteeListResponse, CommitteeResponse
 from app.models.committeeSearch import AutoSuggestionRequest, AutoSuggestionResponse, CommitteeBossNameResponse, CommitteeNoResponse, CommitteeSearchRequest, CommitteeSearchResponse, CommitteeTitleResponse
 from app.models.users import Users
-from app.services.committee import CommitteeService
+from app.services.committee import CommitteeResponseWithEmployees, CommitteeService
 from app.services.committeeSearch import CommitteeSearchService, get_committee_search_service
 from app.services.pdf import PDFService
 from urllib.parse import unquote
@@ -332,7 +332,7 @@ async def getByFilterBooksNo(
 ) -> Dict[str, Any]:
     return await CommitteeService.getCommitteeNoBYQueryParams(
         request, db, page, limit, committeeNo,committeeTitle,committeeBossName,committeeDate_from,committeeDate_to
-        # bookStatus, bookType, directoryName,subject, incomingNo
+        
     )
 
 
@@ -467,23 +467,31 @@ async def committeeReportFunction(
 
 
 
-@committeesRouter.get("/getCommitteeWithPdfsByID/{id}", response_model=CommitteeResponse)
+
+
+@committeesRouter.get("/getCommitteeWithPdfsByID/{id}", response_model=CommitteeResponseWithEmployees)
 async def getCommitteeWithPdfsByIDFunction(
     id: int,
     db: AsyncSession = Depends(get_async_db)
 ):
-   
+    """
+    Get committee by ID with all PDFs and employees
+    """
     try:
-        CommitteeData = await CommitteeService.getCommitteeWithPdfsByIDMethod(db, id)
-        return CommitteeData
+        committee_data = await CommitteeService.getCommitteeWithPdfsByIDMethod(db, id)
+        return committee_data
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching book ID {id}: {str(e)}")
+        logger.error(f"Error fetching committee ID {id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
     
 
-# without file route accept body
+
+
+# WITHOUT FILE - Update route with optional employee IDs
 @committeesRouter.patch("/{id}/json", response_model=Dict[str, Any])
 async def updateRecordWithoutFile(
     id: int,
@@ -493,11 +501,21 @@ async def updateRecordWithoutFile(
     """
     Update a committee record by ID (without file upload)
     Content-Type: application/json
+    
+    Request body can include:
+    - committeeNo, committeeDate, committeeTitle, etc. (committee fields)
+    - employeeIDs: Optional[List[int]] - Array of employee IDs to update junction table
+    
+    If employeeIDs is provided:
+    - Pass empty array [] to remove all employees
+    - Pass array of IDs [1, 2, 3] to replace with new employees
+    - Omit employeeIDs field to leave employees unchanged
     """
     try:
-        print(f"Route (No File) - Updating record ID: {id}")
+        print(f"Route (No File) - Updating committee ID: {id}")
+        print(f"Received data: {data}")
         
-        # Extract and validate data
+        # Extract committee fields
         update_data = {}
         
         if data.get('committeeNo') is not None:
@@ -512,7 +530,6 @@ async def updateRecordWithoutFile(
             update_data['sex'] = data['sex']
         if data.get('committeeCount') is not None:
             update_data['committeeCount'] = data['committeeCount']
-        
         if data.get('notes') is not None:
             update_data['notes'] = data['notes']
         if data.get('currentDate') is not None:
@@ -520,32 +537,74 @@ async def updateRecordWithoutFile(
         if data.get('userID') is not None:
             update_data['userID'] = data['userID']
         
-        if not update_data:
+        #  Extract employee IDs (optional)
+        employee_ids = None
+        if 'employeeIDs' in data:
+            employee_ids_value = data.get('employeeIDs')
+            
+            # Handle different formats
+            if isinstance(employee_ids_value, str):
+                # If it's a JSON string, parse it
+                try:
+                    import json
+                    employee_ids = json.loads(employee_ids_value)
+                except json.JSONDecodeError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid employeeIDs format. Must be a valid JSON array."
+                    )
+            elif isinstance(employee_ids_value, list):
+                # If it's already a list, use it
+                employee_ids = employee_ids_value
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="employeeIDs must be an array or JSON string"
+                )
+            
+            # Validate that all items are integers
+            if not all(isinstance(emp_id, int) for emp_id in employee_ids):
+                raise HTTPException(
+                    status_code=400,
+                    detail="All employee IDs must be integers"
+                )
+            
+            print(f"Employee IDs to update: {employee_ids}")
+        
+        # Check if we have anything to update
+        if not update_data and employee_ids is None:
             raise HTTPException(
                 status_code=400,
                 detail="No fields provided for update"
             )
         
+        # Call service method with optional employee_ids
         updated_record = await CommitteeService.UpdateRecordWithoutFile(
-            db, 
-            id, 
-            update_data
+            db=db,
+            id=id,
+            update_data=update_data,
+            employee_ids=employee_ids  # ✅ Pass employee IDs
         )
         
         return {
             "success": True,
-            "message": "Record updated successfully",
+            "message": "Committee updated successfully",
             "data": updated_record
         }
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error in update route: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Server error: {str(e)}"
-        )    
-    
-   
+        )
+
+
+
+
+
+
 
 # with file
 @committeesRouter.patch("/{id}", response_model=Dict[str, Any])
@@ -557,20 +616,29 @@ async def updateRecordWithFile(
     committeeBossName: Optional[str] = Form(None),
     sex: Optional[str] = Form(None),
     committeeCount: Optional[int] = Form(None),
-    
     notes: Optional[str] = Form(None),
     currentDate: Optional[date] = Form(None),
     userID: Optional[int] = Form(None),
     username: Optional[str] = Form(None),
+    
+    employeeIDs: Optional[str] = Form(None), #  NEW: Optional employee IDs as JSON string
     file: UploadFile = File(...),  # File is REQUIRED in this route
     db: AsyncSession = Depends(get_async_db)
 ):
     """
     Update a committee record by ID with file upload
     Content-Type: multipart/form-data
+    
+    Form fields:
+    - committeeNo, committeeDate, committeeTitle, etc. (optional committee fields)
+    - employeeIDs: Optional JSON string array e.g., "[1, 2, 3]"
+      * If provided: Replace all employees with new list
+      * If "[]": Remove all employees
+      * If None/omitted: Leave employees unchanged
+    - file: Required PDF file
     """
     try:
-        print(f"Route (With File) - Updating record ID: {id}")
+        print(f"Route (With File) - Updating committee ID: {id}")
         
         # Validate file
         if not file or file.size == 0:
@@ -585,7 +653,7 @@ async def updateRecordWithFile(
                 detail="Only PDF files are allowed"
             )
         
-        # Build update dictionary
+        # Build update dictionary for committee fields
         update_data = {
             k: v for k, v in {
                 "committeeNo": committeeNo,
@@ -594,35 +662,64 @@ async def updateRecordWithFile(
                 "committeeBossName": committeeBossName,
                 "sex": sex,
                 "committeeCount": committeeCount,
-    
                 "notes": notes,
                 "currentDate": currentDate,
                 "userID": userID
             }.items() if v is not None
         }
         
-        # Call service method with file
+        #  Parse employee IDs from JSON string (optional)
+        employee_ids = None
+        if employeeIDs is not None:
+            try:
+                import json
+                employee_ids = json.loads(employeeIDs)
+                
+                # Validate that it's a list
+                if not isinstance(employee_ids, list):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="employeeIDs must be a JSON array"
+                    )
+                
+                # Validate that all items are integers
+                if not all(isinstance(emp_id, int) for emp_id in employee_ids):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="All employee IDs must be integers"
+                    )
+                
+                print(f"Parsed employee IDs: {employee_ids}")
+                
+            except json.JSONDecodeError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid employeeIDs JSON format: {str(e)}"
+                )
+        
+        # Call service method with file and optional employee_ids
         updated_record = await CommitteeService.UpdateRecordWithFile(
-            db, 
-            id, 
-            update_data,
-            file,
-            username
+            db=db,
+            id=id,
+            update_data=update_data,
+            file=file,
+            username=username,
+            employee_ids=employee_ids  #  Pass employee IDs
         )
         
         return {
             "success": True,
-            "message": "Record and file updated successfully",
+            "message": "Committee and file updated successfully",
             "data": updated_record
         }
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error in update with file route: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Server error: {str(e)}"
         )
-
 
 
 

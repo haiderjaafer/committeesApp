@@ -36,6 +36,7 @@ import { GrUpdate, GrDocumentPdf } from 'react-icons/gr';
 import { AlertDialogDelete } from './AlertDialogDelete';
 import { FaRegTrashAlt } from 'react-icons/fa';
 import AlertDialogDeleteAllContents from './AlertDialogDeleteAllContents';
+import CommitteeEmployeesDialog from './CommitteeEmployeesDialog';
 
 interface Pagination {
   page: number;
@@ -156,7 +157,7 @@ export default function DynamicTable<T extends CommitteeDataTable>({
       .map((key) => {
         const columnDef: ColumnDef<T> = {
           accessorKey: key,
-          header: key === 'incomingDate' || key === 'bookDate'
+          header: key === 'committeeDate' || key === 'currentDate'
             ? ({ column }: HeaderContext<T, unknown>) => (
                 <div className="flex items-center justify-end gap-1">
                   <span>{headerMap[key] || key}</span>
@@ -223,6 +224,28 @@ export default function DynamicTable<T extends CommitteeDataTable>({
               );
             }
 
+            if (key === 'employeeCount') {
+  return (
+    <div className="text-center  ">
+      <CommitteeEmployeesDialog
+        committeeId={row.original.id}
+        employeeCount={valueStr || '0'}
+        committeeName={row.original.committeeTitle}
+      />
+    </div>
+  );
+}
+
+            //   if (key === 'employeeCount') {
+            //   return (
+            //     <div className="text-center  ">
+            //      <Link href={`/updateCommittee/${row.original.id}`} title='الاعضاء' >
+            //      <h1 className='underline text-green-600 font-extrabold underline-offset-4'>{valueStr || 'غير معروف'}</h1>
+            //     </Link>
+            //     </div>
+            //   );
+            // }
+
             if (shouldTruncate(key)) {
               const truncatedText = truncateText(valueStr);
               return (
@@ -242,10 +265,14 @@ export default function DynamicTable<T extends CommitteeDataTable>({
 
         if (shouldTruncate(key)) {
           columnDef.size = 200;
-        } else if (['bookNo', 'bookDate', 'bookStatus', 'incomingDate'].includes(key)) {
+        } else if (['bookNo', 'committeeDate', 'bookStatus', 'incomingDate'].includes(key)) {
           columnDef.size = 100;
         } else if (key === 'username' || key === 'countOfLateBooks') {
           columnDef.size = 150;
+
+        } else if (key === 'committeeDate') {
+          columnDef.size = 150;
+          
         } else if (key === 'currentDate') {
           columnDef.size = 150;
         } else if (key === 'bookType') {
@@ -253,6 +280,10 @@ export default function DynamicTable<T extends CommitteeDataTable>({
 
         } else if (key === 'pdfCount') {
           columnDef.size = 30;
+
+        } else if (key === 'employeeCount') {
+          columnDef.size = 30;
+
         } else if (key === 'serialNo') {
           columnDef.size = 20;
         } else {

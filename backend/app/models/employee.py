@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, BigInteger, String, SmallInteger,Index
 from sqlalchemy.orm import relationship
 from app.database.database import Base
+from app.models.committee import PDFResponse
 
 class Employee(Base):
     __tablename__ = "employee"
@@ -51,5 +52,32 @@ class EmployeeSearchParams(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+
+#  Updated Response Model
+class EmployeeInCommitteeResponse(BaseModel):
+    empID: int
+    name: str
+    employee_desc: int
+    gender: Optional[int] = None
+    genderName: Optional[str] = None
+
+class CommitteeResponseWithEmployees(BaseModel):
+    id: int
+    committeeNo: str
+    committeeDate: str
+    committeeTitle: str
+    committeeBossName: str
+    sex: Optional[str] = None
+    committeeCount: Optional[int] = None
+    notes: Optional[str] = None
+    currentDate: Optional[str] = None
+    userID: Optional[int] = None
+    username: Optional[str] = None
+    pdfFiles: List[PDFResponse] = []
+    employees: List[EmployeeInCommitteeResponse] = []  # ✅ NEW
+
+
     
     

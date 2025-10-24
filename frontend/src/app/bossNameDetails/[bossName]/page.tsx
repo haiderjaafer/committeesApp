@@ -162,6 +162,7 @@ function CommitteeCard({
     <div className="border border-sky-100 rounded-xl p-5 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
       {/* Header */}
       <div className="border-b pb-3 mb-3">
+        <h1 className='text-center m-auto font-extrabold text-lg text-violet-600'>عنوان اللجنة</h1>
         <h3 className="font-bold font-arabic text-lg text-sky-700 mb-2">
           {committee.committeeTitle}
         </h3>
@@ -171,16 +172,19 @@ function CommitteeCard({
             <span className='font-extrabold text-lg'>رقم اللجنة : </span>
             <h1 className='font-extrabold text-lg'>{committee.committeeNo}</h1>
           </span>
-          <span className="flex items-center  gap-1 font-arabic">
-            <Calendar className="h-3 w-3" />
-            <span className='font-extrabold text-lg'>تأريخ اللجنة :</span>
-           <h1 className='font-extrabold text-lg'> {committee.committeeDate}</h1>
-          </span>
+          
         </div>
       </div>
 
       {/* Details */}
       <div className="space-y-2 text-sm mb-3">
+
+        <span className="flex items-center  gap-1 font-arabic">
+            <Calendar className="h-3 w-3" />
+            <span className='font-extrabold text-lg'>تأريخ اللجنة :</span>
+           <h1 className='font-extrabold text-lg'> {committee.committeeDate}</h1>
+          </span>
+          
         <InfoRow label="رئيس اللجنة" value={committee.committeeBossName} />
         {committee.sex && <InfoRow label="الجنس" value={committee.sex} />}
         {committee.committeeCount !== null && (

@@ -90,16 +90,23 @@ const EmployeeSelectionDialog: React.FC<EmployeeSelectionDialogProps> = ({
 
   <AlertDialogContent
     dir="rtl"
-     className="!max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 rounded-xl"
+     className="!max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 rounded-xl "
 
   >
+      <button
+          onClick={() => setOpen(false)}
+          className="absolute left-4 top-4 rounded-full p-2 hover:bg-gray-100 transition-colors z-50"
+          title="إغلاق"
+        >
+          <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+        </button>
     <AlertDialogHeader>
       <AlertDialogTitle className="text-2xl font-bold text-right font-arabic flex items-center gap-2">
         <Users className="h-6 w-6 text-blue-600" />
         اختيار أعضاء اللجنة
       </AlertDialogTitle>
       <AlertDialogDescription className="text-right font-arabic text-base">
-        ابحث عن الموظفين واختر أعضاء اللجنة. يمكنك البحث بالاسم الأول والثاني أو رقم الموظف.
+        ابحث عن الموظفين واختر أعضاء اللجنة. يمكنك البحث بالاسم الأول والثاني أو رقم الحاسبة.
       </AlertDialogDescription>
     </AlertDialogHeader>
 
@@ -141,7 +148,7 @@ const EmployeeSelectionDialog: React.FC<EmployeeSelectionDialogProps> = ({
         className="bg-blue-600 hover:bg-blue-700 font-bold font-arabic"
       >
         <Save className="ml-2 h-4 w-4" />
-        حفظ ({tempSelectedIDs.length})
+        اختيار ({tempSelectedIDs.length})
       </AlertDialogAction>
     </AlertDialogFooter>
   </AlertDialogContent>

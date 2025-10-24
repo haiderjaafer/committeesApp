@@ -2,13 +2,14 @@ from datetime import date, datetime
 import os
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import unquote
 from app.helper.save_pdf import save_pdf_to_server
 from app.models.PDFTable import PDFCreate, PDFResponse, PDFTable
 from app.models.committee import Committee, CommitteeCreate, CommitteeResponse
-from app.models.employee import Employee
+from app.models.employee import CommitteeResponseWithEmployees, Employee, EmployeeInCommitteeResponse
 from app.models.junction_committee_employee import JunctionCommitteeEmployee
 from app.models.users import Users
 import logging
@@ -198,6 +199,7 @@ class CommitteeService:
         """
         Retrieve committee records with pagination and optional filters.
         Supports independent filtering by committeeNo, committeeTitle, committeeBossName, or date range.
+        Now includes employee count for each committee.
         """
         try:
             # Build filters dynamically
@@ -233,44 +235,46 @@ class CommitteeService:
             offset = (page - 1) * limit
 
             # Fetch paginated records
-            
             query = (
-            select(
-                Committee.id,
-                Committee.committeeNo,
-                Committee.committeeDate,
-                Committee.committeeTitle,
-                Committee.committeeBossName,
-                Committee.committeeCount,
-                Committee.notes,
-                Committee.userID,
-                Committee.currentDate,
-                Users.username,
+                select(
+                    Committee.id,
+                    Committee.committeeNo,
+                    Committee.committeeDate,
+                    Committee.committeeTitle,
+                    Committee.committeeBossName,
+                    Committee.committeeCount,
+                    Committee.notes,
+                    Committee.userID,
+                    Committee.currentDate,
+                    Users.username,
+                )
+                .outerjoin(Users, Committee.userID == Users.id)
+                .filter(*filters)
+                .group_by(
+                    Committee.id,
+                    Committee.committeeNo,
+                    Committee.committeeDate,
+                    Committee.committeeTitle,
+                    Committee.committeeBossName,
+                    Committee.committeeCount,
+                    Committee.notes,
+                    Committee.userID,
+                    Committee.currentDate,
+                    Users.username,
+                )
+                .order_by(desc(Committee.currentDate))
+                .offset(offset)
+                .limit(limit)
             )
-            .outerjoin(Users, Committee.userID == Users.id)
-            .filter(*filters)
-            .group_by(
-                Committee.id,
-                Committee.committeeNo,
-                Committee.committeeDate,
-                Committee.committeeTitle,
-                Committee.committeeBossName,
-                Committee.committeeCount,
-                Committee.notes,
-                Committee.userID,
-                Committee.currentDate,
-                Users.username,
-            )
-            .order_by(desc(Committee.currentDate))
-            .offset(offset)
-            .limit(limit)
-        )
-    
+            
             result = await db.execute(query)
             rows = result.fetchall()
 
-            # Fetch PDFs for the committeeNos
+            # Extract committee IDs for fetching related data
+            committee_ids = [row.id for row in rows]
             committee_nos = [row.committeeNo for row in rows]
+
+            # ✅ Step 1: Fetch PDFs for the committeeNos
             pdf_stmt = (
                 select(
                     PDFTable.id,
@@ -297,7 +301,27 @@ class CommitteeService:
                     "username": pdf.username,
                 })
 
-            # Format response data
+            #  Step 2: Fetch employee counts for each committee
+            employee_count_stmt = (
+                select(
+                    JunctionCommitteeEmployee.committeeID,
+                    func.count(JunctionCommitteeEmployee.empID).label('employee_count')
+                )
+                .filter(JunctionCommitteeEmployee.committeeID.in_(committee_ids))
+                .group_by(JunctionCommitteeEmployee.committeeID)
+            )
+            employee_count_result = await db.execute(employee_count_stmt)
+            employee_count_rows = employee_count_result.fetchall()
+
+            # Create map of committee ID to employee count
+            employee_count_map = {
+                row.committeeID: row.employee_count 
+                for row in employee_count_rows
+            }
+
+            logger.info(f"Employee counts: {employee_count_map}")
+
+            # ✅ Step 3: Format response data with employee count
             data = [
                 {
                     "serialNo": offset + i + 1,
@@ -307,20 +331,18 @@ class CommitteeService:
                     "committeeTitle": row.committeeTitle,
                     "committeeBossName": row.committeeBossName,
                     "committeeCount": row.committeeCount,
-                   
-                   
                     "notes": row.notes,
                     "currentDate": row.currentDate.strftime("%Y-%m-%d") if row.currentDate else None,
                     "userID": row.userID,
                     "username": row.username,
                     "pdfFiles": pdf_map.get(row.committeeNo, []),
-                    "pdfCount": len(pdf_map.get(row.committeeNo, []))
-
+                    "pdfCount": len(pdf_map.get(row.committeeNo, [])),
+                    "employeeCount": employee_count_map.get(row.id, 0)  # ✅ NEW: Employee count
                 }
-                for i, row in enumerate(rows)  # Fixed: Iterate over rows
+                for i, row in enumerate(rows)
             ]
 
-            logger.info(f"Fetched {len(data)} records with PDFs")
+            logger.info(f"Fetched {len(data)} records with PDFs and employees")
             return {
                 "data": data,
                 "total": total,
@@ -466,16 +488,22 @@ class CommitteeService:
 
 
 
+
+
+
+
+
     
     @staticmethod
     async def getCommitteeWithPdfsByIDMethod(
         db: AsyncSession, 
         id: int
-    ) -> CommitteeResponse:
+    ) -> Dict[str,Any]:
         """
-        Fetch committee with all associated PDFs and user information
+        Fetch committee with all associated PDFs, user information, and employees
         """
         try:
+            # Step 1: Fetch committee with PDFs
             result = await db.execute(
                 select(Committee, PDFTable, Users)
                 .outerjoin(PDFTable, Committee.id == PDFTable.committeeID)
@@ -503,7 +531,7 @@ class CommitteeService:
                 else committee.currentDate
             )
 
-            #  PDFResponse will handle date conversion automatically
+            # Build PDF responses
             pdf_responses: List[PDFResponse] = [
                 PDFResponse(
                     id=pdf.id,
@@ -511,7 +539,7 @@ class CommitteeService:
                     committeeNo=pdf.committeeNo,
                     countPdf=pdf.countPdf,
                     pdf=pdf.pdf,
-                    currentDate=pdf.currentDate,  #  Let Pydantic handle it
+                    currentDate=pdf.currentDate,
                     userID=pdf.userID,
                     username=user.username if user else None
                 )
@@ -526,7 +554,34 @@ class CommitteeService:
                 )
                 committee_user = committee_user_result.scalars().first()
 
-            return CommitteeResponse(
+            # ✅ Step 2: Fetch employees for this committee
+            employees_result = await db.execute(
+                select(Employee)
+                .join(
+                    JunctionCommitteeEmployee,
+                    Employee.empID == JunctionCommitteeEmployee.empID
+                )
+                .filter(JunctionCommitteeEmployee.committeeID == id)
+                .order_by(Employee.name.asc())
+            )
+            employees = employees_result.scalars().all()
+            
+            logger.info(f"Found {len(employees)} employees for committee {id}")
+            
+            # Build employee responses
+            employee_responses: List[EmployeeInCommitteeResponse] = [
+                EmployeeInCommitteeResponse(
+                    empID=emp.empID,
+                    name=emp.name,
+                    employee_desc=emp.employee_desc,
+                    gender=emp.gender,
+                    genderName="ذكر" if emp.gender == 1 else "أنثى" if emp.gender == 2 else None
+                )
+                for emp in employees
+            ]
+
+            # ✅ Step 3: Return complete response
+            return CommitteeResponseWithEmployees(
                 id=committee.id,
                 committeeNo=committee.committeeNo,
                 committeeDate=converted_committee_date,
@@ -538,7 +593,8 @@ class CommitteeService:
                 currentDate=converted_current_date,
                 userID=committee.userID,
                 username=committee_user.username if committee_user else None,
-                pdfFiles=pdf_responses
+                pdfFiles=pdf_responses,
+                employees=employee_responses  # ✅ Include employees
             )
 
         except HTTPException:
@@ -547,20 +603,37 @@ class CommitteeService:
             logger.error(f"Error fetching Committee ID {id}: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+    
+
 
     @staticmethod
     async def UpdateRecordWithoutFile(
         db: AsyncSession,
         id: int,
-        update_data: Dict[str, Any]
+        update_data: Dict[str, Any],
+        employee_ids: Optional[List[int]] = None  #  Optional employee IDs
     ) -> Dict[str, Any]:
         """
         Update a committee record without file upload
+        
+        Args:
+            db: Database session
+            id: Committee ID
+            update_data: Dictionary of committee fields to update
+            employee_ids: Optional list of employee IDs
+                - If provided: Update junction table (replace all employees)
+                - If None: Leave employees unchanged
+                - If empty list []: Remove all employees
+        
+        Returns:
+            Dictionary with updated committee data and employee count
         """
         try:
-            print(f"Service (No File) - Updating committee ID: {id}")
+            print(f"Service - Updating committee ID: {id}")
+            print(f"Update data: {update_data}")
+            print(f"Employee IDs: {employee_ids}")
             
-            # Check if record exists
+            # Step 1: Check if committee exists
             stmt = select(Committee).where(Committee.id == id)
             result = await db.execute(stmt)
             existing_record = result.scalar_one_or_none()
@@ -571,19 +644,77 @@ class CommitteeService:
                     detail=f"Committee with ID {id} not found"
                 )
             
-            # Update the record
-            for key, value in update_data.items():
-                if hasattr(existing_record, key):
-                    setattr(existing_record, key, value)
+            # Step 2: Update committee fields
+            if update_data:
+                for key, value in update_data.items():
+                    if hasattr(existing_record, key):
+                        setattr(existing_record, key, value)
+                        logger.info(f"Updated {key} = {value}")
             
-            # Commit changes
+            #  Step 3: Update employee associations if provided
+            employee_count = None
+            if employee_ids is not None:
+                logger.info(f"Updating employees for committee {id}")
+                
+                # Step 3a: Delete all existing employee associations
+                delete_stmt = delete(JunctionCommitteeEmployee).where(
+                    JunctionCommitteeEmployee.committeeID == id
+                )
+                delete_result = await db.execute(delete_stmt)
+                deleted_count = delete_result.rowcount
+                logger.info(f"Deleted {deleted_count} existing employee associations")
+                
+                # Step 3b: Insert new employee associations
+                if employee_ids:  # Only if list is not empty
+                    # Validate that all employee IDs exist
+                    valid_emp_stmt = select(Employee.empID).where(
+                        Employee.empID.in_(employee_ids)
+                    )
+                    valid_emp_result = await db.execute(valid_emp_stmt)
+                    valid_emp_ids = [row[0] for row in valid_emp_result.fetchall()]
+                    
+                    # Check for invalid IDs
+                    invalid_ids = set(employee_ids) - set(valid_emp_ids)
+                    if invalid_ids:
+                        await db.rollback()
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid employee IDs: {list(invalid_ids)}"
+                        )
+
+                    userID = update_data.get('userID') or existing_record.userID
+
+                    # Insert new associations
+                    for emp_id in employee_ids:
+                        junction_entry = JunctionCommitteeEmployee(
+                            committeeID=id,
+                            empID=emp_id,
+                            createdBy=userID
+                        )
+                        db.add(junction_entry)
+                    
+                    logger.info(f"Added {len(employee_ids)} new employee associations")
+                    employee_count = len(employee_ids)
+                else:
+                    logger.info("Removed all employee associations (empty array provided)")
+                    employee_count = 0
+            else:
+                # Step 3c: If employee_ids is None, count existing employees
+                count_stmt = select(JunctionCommitteeEmployee).where(
+                    JunctionCommitteeEmployee.committeeID == id
+                )
+                count_result = await db.execute(count_stmt)
+                employee_count = len(count_result.scalars().all())
+                logger.info(f"Employee associations unchanged, current count: {employee_count}")
+            
+            # Step 4: Commit all changes
             await db.commit()
             await db.refresh(existing_record)
             
-            logger.info(f"Successfully updated committee ID {id} without file")
+            logger.info(f"Successfully updated committee ID {id}")
             
-            # Convert to dictionary
-            return {
+            # Step 5: Return updated data
+            response_data = {
                 "id": existing_record.id,
                 "committeeNo": existing_record.committeeNo,
                 "committeeDate": existing_record.committeeDate.isoformat() if existing_record.committeeDate else None,
@@ -591,23 +722,24 @@ class CommitteeService:
                 "committeeBossName": existing_record.committeeBossName,
                 "sex": existing_record.sex,
                 "committeeCount": existing_record.committeeCount,
-              
                 "notes": existing_record.notes,
                 "currentDate": existing_record.currentDate.isoformat() if existing_record.currentDate else None,
-                "userID": existing_record.userID
+                "userID": existing_record.userID,
+                "employeeCount": employee_count  #  Include employee count
             }
+            
+            return response_data
             
         except HTTPException:
             await db.rollback()
             raise
         except Exception as e:
-            logger.error(f"Error updating committee ID {id}: {str(e)}")
+            logger.error(f"Error updating committee ID {id}: {str(e)}", exc_info=True)
             await db.rollback()
             raise HTTPException(
                 status_code=500,
                 detail=f"Database error: {str(e)}"
-            )    
-
+            )
 
 
 
@@ -619,15 +751,32 @@ class CommitteeService:
         id: int,
         update_data: Dict[str, Any],
         file: UploadFile,
-        username: Optional[str] = None
+        username: Optional[str] = None,
+        employee_ids: Optional[List[int]] = None  #  NEW: Optional employee IDs
     ) -> Dict[str, Any]:
         """
         Update a committee record with file upload
+        
+        Args:
+            db: Database session
+            id: Committee ID
+            update_data: Dictionary of committee fields to update
+            file: PDF file to upload
+            username: Username for file saving
+            employee_ids: Optional list of employee IDs
+                - If provided: Update junction table (replace all employees)
+                - If None: Leave employees unchanged
+                - If empty list []: Remove all employees
+        
+        Returns:
+            Dictionary with updated committee data, file info, and employee count
         """
         try:
             print(f"Service (With File) - Updating committee ID: {id}")
+            print(f"Update data: {update_data}")
+            print(f"Employee IDs: {employee_ids}")
             
-            # Check if record exists
+            # Step 1: Check if committee exists
             stmt = select(Committee).where(Committee.id == id)
             result = await db.execute(stmt)
             existing_record = result.scalar_one_or_none()
@@ -638,10 +787,10 @@ class CommitteeService:
                     detail=f"Committee with ID {id} not found"
                 )
             
-            # Get userID
+            # Step 2: Get userID
             userID = update_data.get('userID') or existing_record.userID
             
-            # Get committeeNo and committeeDate from update_data or existing record
+            # Step 3: Get committeeNo and committeeDate (for file naming)
             committee_no = update_data.get('committeeNo') or existing_record.committeeNo
             committee_date = update_data.get('committeeDate') or existing_record.committeeDate
             
@@ -663,7 +812,8 @@ class CommitteeService:
             else:
                 committee_date_str = str(committee_date)
             
-            # Save the file
+            # Step 4: Save the file
+            file_path = None
             try:
                 count = await PDFService.get_pdf_count(db, id)
                 file_path = save_pdf_to_server(
@@ -692,25 +842,82 @@ class CommitteeService:
                     detail=str(e)
                 )
             except Exception as e:
+                logger.error(f"Error saving file: {str(e)}")
                 raise HTTPException(
                     status_code=500,
                     detail=f"Error saving file: {str(e)}"
                 )
             
-            # Update the record if there's additional data
+            # Step 5: Update committee fields
             if update_data:
                 for key, value in update_data.items():
                     if hasattr(existing_record, key):
                         setattr(existing_record, key, value)
+                        logger.info(f"Updated {key} = {value}")
             
-            # Commit changes
+            #  Step 6: Update employee associations if provided
+            employee_count = None
+            if employee_ids is not None:
+                logger.info(f"Updating employees for committee {id}")
+                
+                # Step 6a: Delete all existing employee associations
+                delete_stmt = delete(JunctionCommitteeEmployee).where(
+                    JunctionCommitteeEmployee.committeeID == id
+                )
+                delete_result = await db.execute(delete_stmt)
+                deleted_count = delete_result.rowcount
+                logger.info(f"Deleted {deleted_count} existing employee associations")
+                
+                # Step 6b: Insert new employee associations
+                if employee_ids:  # Only if list is not empty
+                    # Validate that all employee IDs exist
+                    valid_emp_stmt = select(Employee.empID).where(
+                        Employee.empID.in_(employee_ids)
+                    )
+                    valid_emp_result = await db.execute(valid_emp_stmt)
+                    valid_emp_ids = [row[0] for row in valid_emp_result.fetchall()]
+                    
+                    # Check for invalid IDs
+                    invalid_ids = set(employee_ids) - set(valid_emp_ids)
+                    if invalid_ids:
+                        await db.rollback()
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid employee IDs: {list(invalid_ids)}"
+                        )
+                    
+                    # Insert new associations
+                    for emp_id in employee_ids:
+                        junction_entry = JunctionCommitteeEmployee(
+                            committeeID=id,
+                            empID=emp_id,
+                            createdBy=userID
+                            
+                        )
+                        db.add(junction_entry)
+                    
+                    logger.info(f"Added {len(employee_ids)} new employee associations")
+                    employee_count = len(employee_ids)
+                else:
+                    logger.info("Removed all employee associations (empty array provided)")
+                    employee_count = 0
+            else:
+                # Step 6c: If employee_ids is None, count existing employees
+                count_stmt = select(JunctionCommitteeEmployee).where(
+                    JunctionCommitteeEmployee.committeeID == id
+                )
+                count_result = await db.execute(count_stmt)
+                employee_count = len(count_result.scalars().all())
+                logger.info(f"Employee associations unchanged, current count: {employee_count}")
+            
+            # Step 7: Commit all changes
             await db.commit()
             await db.refresh(existing_record)
             
             logger.info(f"Successfully updated committee ID {id} with file")
             
-            # Convert to dictionary
-            return {
+            # Step 8: Return updated data
+            response_data = {
                 "id": existing_record.id,
                 "committeeNo": existing_record.committeeNo,
                 "committeeDate": existing_record.committeeDate.isoformat() if existing_record.committeeDate else None,
@@ -718,25 +925,28 @@ class CommitteeService:
                 "committeeBossName": existing_record.committeeBossName,
                 "sex": existing_record.sex,
                 "committeeCount": existing_record.committeeCount,
-              
                 "notes": existing_record.notes,
                 "currentDate": existing_record.currentDate.isoformat() if existing_record.currentDate else None,
                 "userID": existing_record.userID,
                 "file_saved": True,
-                "file_path": file_path
+                "file_path": file_path,
+                "employeeCount": employee_count  #   employee count
             }
+            
+            return response_data
             
         except HTTPException:
             await db.rollback()
             raise
         except Exception as e:
-            logger.error(f"Error updating committee ID {id} with file: {str(e)}")
+            logger.error(f"Error updating committee ID {id} with file: {str(e)}", exc_info=True)
             await db.rollback()
             raise HTTPException(
                 status_code=500,
                 detail=f"Database error: {str(e)}"
             )
-        
+
+             
 
 
         

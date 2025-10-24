@@ -1,183 +1,169 @@
 'use client';
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+
+import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
-import DropzoneComponent, { DropzoneComponentRef } from '../ReactDropZoneComponont';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import ArabicDatePicker from '@/components/DatePicker/ArabicDatePicker';
+import DropzoneComponent, { DropzoneComponentRef } from '@/components/ReactDropZoneComponont';
+import { JWTPayload } from '@/utiles/verifyToken';
+import { BossNameAutocomplete } from '../BossName';
+import EmployeeSelectionDialog from '@/components/EmployeeSelectionDialog';
+import { useQuery } from '@tanstack/react-query';
+import { User, Hash, X, Users, Loader2, Save, ArrowLeft } from 'lucide-react';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { FileText, Eye, BookOpen } from 'lucide-react';
-import ArabicDatePicker from '../DatePicker/ArabicDatePicker';
-//import { JWTPayload } from '@/utiles/verifyToken';
-
-// Define the committee response type based on your API data
-
-export interface JWTPayload {
-  id: number;
-  username: string;
-  permission: string;
-}
-
-interface PDFResponse {
-  id: number;
-  committeeID: number;
-  committeeNo: string | null;
-  pdf: string | null;
-  currentDate: string | null;
-  username: string | null;
-}
-
-interface CommitteeResponse {
-  id: number;
+// Interfaces
+interface CommitteeFormData {
   committeeNo: string;
   committeeDate: string;
   committeeTitle: string;
   committeeBossName: string;
-  sex: string;
-  committeeCount: number;
- 
-  notes: string;
-  currentDate: string;
-  userID: number;
-  username: string;
-  pdfFiles?: PDFResponse[];
-}
-
-// Committee form type
-interface CommitteeFormType {
-  committeeNo: string;
-  committeeDate: string;
-  committeeTitle: string;
-  committeeBossName: string;
-  sex: string;
-  committeeCount: number;
- 
+  sex?: string;
+  committeeCount: string;
   notes: string;
   userID: string;
 }
 
-
-
-
-
-interface UpdateCommitteeByIDProps {
-  committeeId: string;
-  payload: JWTPayload;
+interface Employee {
+  empID: number;
+  name: string;
+  employee_desc: number;
+  gender?: number;
+  genderName?: string;
 }
 
-export default function UpdateCommitteeByID({ committeeId, payload }: UpdateCommitteeByIDProps) {
-  console.log("UpdateCommitteeByID CLIENT", payload);
+interface CommitteeUpdateFormProps {
+  payload: JWTPayload;
+  committeeId: number;
+}
 
-  // Updated helper function to handle date fields safely
-  const getDateValue = (dateValue: string | null | undefined, useCurrentAsDefault = false) => {
-    if (!dateValue || dateValue.trim() === '') {
-      return useCurrentAsDefault ? format(new Date(), 'yyyy-MM-dd') : '';
-    }
-    try {
-      const testDate = new Date(dateValue);
-      if (isNaN(testDate.getTime())) {
-        return useCurrentAsDefault ? format(new Date(), 'yyyy-MM-dd') : '';
-      }
-      return dateValue;
-    } catch {
-      return useCurrentAsDefault ? format(new Date(), 'yyyy-MM-dd') : '';
-    }
-  };
-  
-  // Memoize API base URL
-  const API_BASE_URL = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || '', []);
-
+export default function CommitteeUpdateForm({ 
+  payload, 
+  committeeId
+}: CommitteeUpdateFormProps) {
+  const router = useRouter();
   const dropzoneRef = useRef<DropzoneComponentRef>(null);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pdfFiles, setPdfFiles] = useState<PDFResponse[]>([]);
-  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const userID = payload.id?.toString() || '';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-  // Static userID as requested
-  const userID = '1';
-
-  const [formData, setFormData] = useState<CommitteeFormType>({
+  // Form state
+  const [formData, setFormData] = useState<CommitteeFormData>({
     committeeNo: '',
     committeeDate: format(new Date(), 'yyyy-MM-dd'),
     committeeTitle: '',
     committeeBossName: '',
     sex: '',
-    committeeCount: 0,
-   
+    committeeCount: '',
     notes: '',
     userID: userID,
   });
 
-  // Fetch committee data
-  const fetchCommitteeData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await axios.get<CommitteeResponse>(
-        `${API_BASE_URL}/api/committees/getCommitteeWithPdfsByID/${committeeId}`
-      );
-      const committee = response.data;
-      console.log("committee data...", committee);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasFileChanged, setHasFileChanged] = useState(false);
 
-      setFormData({
-        committeeNo: committee.committeeNo || '',
-        committeeDate: getDateValue(committee.committeeDate, true),
-        committeeTitle: committee.committeeTitle || '',
-        committeeBossName: committee.committeeBossName || '',
-        sex: committee.sex || '',
-        committeeCount: committee.committeeCount || 0,
+  // Employee state
+  const [selectedEmployeeIDs, setSelectedEmployeeIDs] = useState<number[]>([]);
+  const [hasEmployeeChanged, setHasEmployeeChanged] = useState(false);
+  const [initialEmployeeIDs, setInitialEmployeeIDs] = useState<number[]>([]);
+
+  // ✅ Fetch committee details
+  const { data: committeeDetails, isLoading: isLoadingCommittee } = useQuery({
+    queryKey: ['committee-full-details', committeeId],
+    queryFn: async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/committees/getCommitteeWithPdfsByID/${committeeId}`,
+          { withCredentials: true }
+        );
         
-        notes: committee.notes || '',
-        userID: userID,
-      });
+        console.log('Committee details loaded:', response.data);
+        
+        const data = response.data;
+        
+        // Set form data
+        setFormData({
+          committeeNo: data.committeeNo || '',
+          committeeDate: data.committeeDate || format(new Date(), 'yyyy-MM-dd'),
+          committeeTitle: data.committeeTitle || '',
+          committeeBossName: data.committeeBossName || '',
+          sex: data.sex || '',
+          committeeCount: data.committeeCount?.toString() || '',
+          notes: data.notes || '',
+          userID: userID,
+        });
+        
+        // ✅ Set initial employees
+        const employeeIDs = data.employees?.map((emp: Employee) => emp.empID) || [];
+        setSelectedEmployeeIDs(employeeIDs);
+        setInitialEmployeeIDs(employeeIDs);
+        
+        console.log('Loaded employees:', employeeIDs);
+        
+        return data;
+      } catch (err) {
+        console.error('Error loading committee:', err);
+        toast.error('فشل في تحميل بيانات اللجنة');
+        throw err;
+      }
+    },
+    enabled: !!committeeId,
+  });
 
-      setPdfFiles(committee.pdfFiles || []);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error fetching committee data:', error);
-      toast.error('فشل في جلب بيانات اللجنة. يرجى المحاولة مرة أخرى');
-      setIsLoading(false);
-    }
-  }, [committeeId, API_BASE_URL, userID]);
+  // ✅ FIX: Fetch employee details based on CURRENT selectedEmployeeIDs (not from committeeDetails)
+  const { data: selectedEmployees, isLoading: isLoadingSelectedEmployees } = useQuery<Employee[], Error>({
+    queryKey: ['selected-employees-details', selectedEmployeeIDs],
+    queryFn: async () => {
+      if (selectedEmployeeIDs.length === 0) {
+        console.log('No employees selected');
+        return [];
+      }
 
-  useEffect(() => {
-    fetchCommitteeData();
-  }, [fetchCommitteeData]);
+      try {
+        console.log('Fetching details for employee IDs:', selectedEmployeeIDs);
+        
+        const promises = selectedEmployeeIDs.map(async (empID) => {
+          const response = await axios.get(
+            `${API_BASE_URL}/api/employees/${empID}`,
+            { withCredentials: true }
+          );
+          return response.data.data;
+        });
+        
+        const employees = await Promise.all(promises);
+        console.log('Loaded employee details:', employees);
+        return employees;
+      } catch (err) {
+        console.error('Error fetching employee details:', err);
+        return [];
+      }
+    },
+    enabled: selectedEmployeeIDs.length > 0,
+    staleTime: 0, // ✅ Don't cache - always refetch when IDs change
+  });
 
-  // Handle text input and select changes
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const { name, value, type } = e.target;
+      const { name, value } = e.target;
       setFormData((prev) => ({
         ...prev,
-        [name]: type === 'number' ? parseInt(value) || 0 : value,
+        [name]: value,
       }));
     },
     []
   );
 
-  // Handle date changes
-  const handleDateChange = useCallback(
-    (key: "committeeDate", value: string) => {
-      if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        toast.error("يرجى إدخال التاريخ بصيغة YYYY-MM-DD");
-        return;
-      }
-      setFormData((prev) => ({ ...prev, [key]: value }));
-    },
-    []
-  );
+  const handleDateChange = useCallback((value: string) => {
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      toast.error('يرجى إدخال التاريخ بصيغة YYYY-MM-DD');
+      return;
+    }
+    setFormData((prev) => ({ ...prev, committeeDate: value }));
+  }, []);
 
-  // Handle file acceptance
   const handleFilesAccepted = useCallback((files: File[]) => {
     if (files.length > 0) {
       const file = files[0];
@@ -190,26 +176,71 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
         return;
       }
       setSelectedFile(file);
+      setHasFileChanged(true);
       toast.info(`تم اختيار الملف ${file.name}`);
     }
   }, []);
 
-  // Handle file removal
   const handleFileRemoved = useCallback((fileName: string) => {
     setSelectedFile(null);
+    setHasFileChanged(false);
     toast.info(`تم إزالة الملف ${fileName}`);
   }, []);
 
-  // Handle committee PDF loading result
-  const handleCommitteePdfLoaded = useCallback((success: boolean, file?: File) => {
-    console.log(`📄 Committee PDF loaded: ${success ? 'SUCCESS' : 'FAILED'}`);
+  const handleBookPdfLoaded = useCallback((success: boolean, file?: File) => {
     if (success && file) {
       setSelectedFile(file);
-      toast.info('تم تحميل ملف committee.pdf بنجاح');
+      setHasFileChanged(true);
     } else {
       setSelectedFile(null);
+      setHasFileChanged(false);
     }
   }, []);
+
+  const handleBossNameSelect = useCallback((bossName: string) => {
+    console.log('Selected boss name:', bossName);
+  }, []);
+
+  // ✅ Handle employee selection
+  const handleEmployeesSelected = useCallback((empIDs: number[]) => {
+    console.log('New employee IDs:', empIDs);
+    console.log('Initial employee IDs:', initialEmployeeIDs);
+    
+    setSelectedEmployeeIDs(empIDs);
+    
+    // Check if employees changed
+    const hasChanged = JSON.stringify([...empIDs].sort()) !== 
+                      JSON.stringify([...initialEmployeeIDs].sort());
+    setHasEmployeeChanged(hasChanged);
+    
+    toast.success(`تم تحديد ${empIDs.length} موظف`);
+  }, [initialEmployeeIDs]);
+
+  // ✅ FIX: Remove individual employee
+  const removeEmployee = useCallback((empID: number) => {
+    console.log('Removing employee:', empID);
+    console.log('Current IDs before removal:', selectedEmployeeIDs);
+    
+    const newIDs = selectedEmployeeIDs.filter(id => id !== empID);
+    
+    console.log('New IDs after removal:', newIDs);
+    
+    setSelectedEmployeeIDs(newIDs);
+    
+    const hasChanged = JSON.stringify([...newIDs].sort()) !== 
+                      JSON.stringify([...initialEmployeeIDs].sort());
+    setHasEmployeeChanged(hasChanged);
+    
+    toast.info('تم إزالة الموظف من القائمة');
+  }, [selectedEmployeeIDs, initialEmployeeIDs]);
+
+  // ✅ Clear all employees
+  const clearAllEmployees = useCallback(() => {
+    console.log('Clearing all employees');
+    setSelectedEmployeeIDs([]);
+    setHasEmployeeChanged(initialEmployeeIDs.length > 0);
+    toast.info('تم مسح جميع الموظفين');
+  }, [initialEmployeeIDs]);
 
   // Handle form submission
   const handleSubmit = useCallback(
@@ -217,283 +248,119 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
       e.preventDefault();
       setIsSubmitting(true);
 
-      console.log("form data client", formData);
-
-      // Required fields validation
-      const requiredFields: (keyof CommitteeFormType)[] = [
-        'committeeNo',
-        'committeeDate',
-        'committeeTitle',
-        'committeeBossName',
-        'sex',
-        'userID'
-      ];
-
-      const fieldLabels: Record<keyof CommitteeFormType, string> = {
-        committeeNo: 'رقم اللجنة',
-        committeeDate: 'تاريخ اللجنة',
-        committeeTitle: 'عنوان اللجنة',
-        committeeBossName: 'اسم رئيس اللجنة',
-        sex: 'الجنس',
-        committeeCount: 'عدد اللجنة',
-        
-        notes: 'الملاحظات',
-        userID: 'المستخدم',
-      };
-
-      for (const field of requiredFields) {
-        if (!formData[field]) {
-          const label = fieldLabels[field] || field;
-          toast.error(`يرجى ملء حقل ${label}`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Check if we have a valid file selected
-      const hasValidFile = selectedFile && 
-                          selectedFile instanceof File && 
-                          selectedFile.size > 0 && 
-                          selectedFile.type === 'application/pdf';
-
-      console.log('File validation:', {
-        selectedFile: !!selectedFile,
-        isFile: selectedFile instanceof File,
-        size: selectedFile?.size,
-        type: selectedFile?.type,
-        hasValidFile
-      });
-
       try {
-        let response;
+        console.log('Submitting update...');
+        console.log('Selected employee IDs:', selectedEmployeeIDs);
+        console.log('Has file changed:', hasFileChanged);
+        console.log('Has employees changed:', hasEmployeeChanged);
 
-        console.log('Starting committee update request...');
-
-        if (hasValidFile) {
-          // If we have a file, use FormData (multipart/form-data)
+        if (hasFileChanged && selectedFile) {
+          // UPDATE WITH FILE
+          console.log('Updating WITH file');
+          
           const formDataToSend = new FormData();
           
-          // Append form fields
           Object.entries(formData).forEach(([key, value]) => {
-            formDataToSend.append(key, value?.toString() || '');
+            if (value) {
+              formDataToSend.append(key, value);
+            }
           });
           
-          // Append the file and username
-          formDataToSend.append('file', selectedFile);
-          formDataToSend.append('username', payload.username);
-
-          console.log('Sending with file - FormData entries:');
-          for (let [key, value] of formDataToSend.entries()) {
-            console.log(key, value);
+          if (hasEmployeeChanged) {
+            formDataToSend.append('employeeIDs', JSON.stringify(selectedEmployeeIDs));
           }
-
-          response = await axios.patch(
+          
+          formDataToSend.append('file', selectedFile);
+          
+          const response = await axios.patch(
             `${API_BASE_URL}/api/committees/${committeeId}`,
-            formDataToSend
-          );
-
-          console.log('FormData response:', response.status, response.data);
-        } else {
-          // If no file, send JSON data
-          const jsonData = {
-            committeeNo: formData.committeeNo,
-            committeeDate: formData.committeeDate,
-            committeeTitle: formData.committeeTitle,
-            committeeBossName: formData.committeeBossName,
-            sex: formData.sex,
-            committeeCount: formData.committeeCount,
-           
-            notes: formData.notes || null,
-            userID: parseInt(userID),
-          };
-
-          console.log('Sending without file - JSON data:', jsonData);
-
-          response = await axios.patch(
-            `${API_BASE_URL}/api/committees/${committeeId}/json`,
-            jsonData,
+            formDataToSend,
             {
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'multipart/form-data' },
+              withCredentials: true,
             }
           );
-          console.log('JSON response:', response.status, response.data);
-        }
-
-        console.log('Update request completed with status:', response.status);
-
-        if (response.status === 200 || response.status === 201) {
-          toast.success('تم تعديل اللجنة بنجاح!');
           
-          // Only reset file-related state, keep form data as is
-          setSelectedFile(null);
-          if (dropzoneRef.current) {
-            dropzoneRef.current.reset(true);
-          }
+          toast.success('تم تحديث اللجنة والملف بنجاح!');
+          
         } else {
-          throw new Error(`Unexpected response status: ${response.status}`);
+          // UPDATE WITHOUT FILE
+          console.log('Updating WITHOUT file');
+          
+          const updatePayload: any = { ...formData };
+          
+          if (hasEmployeeChanged) {
+            updatePayload.employeeIDs = selectedEmployeeIDs;
+          }
+          
+          const response = await axios.patch(
+            `${API_BASE_URL}/api/committees/${committeeId}/json`,
+            updatePayload,
+            {
+              headers: { 'Content-Type': 'application/json' },
+              withCredentials: true,
+            }
+          );
+          
+          toast.success('تم تحديث اللجنة بنجاح!');
         }
+        
+        setTimeout(() => {
+          router.push('/searchPanel');
+        }, 1500);
+        
       } catch (error) {
         console.error('Error updating committee:', error);
-        
-        let message = 'فشل في تحديث اللجنة. يرجى المحاولة مرة أخرى';
-
-        if (axios.isAxiosError(error)) {
-          if (error.response?.data) {
-            console.error('Server error response:', error.response.data);
-            
-            if (typeof error.response.data === 'string') {
-              message += `: ${error.response.data}`;
-            } else if (error.response.data.detail) {
-              message += `: ${error.response.data.detail}`;
-            } else if (error.response.data.message) {
-              message += `: ${error.response.data.message}`;
-            } else {
-              message += `: ${JSON.stringify(error.response.data)}`;
-            }
-          } else if (error.message) {
-            message += `: ${error.message}`;
-          }
-        } else if (error instanceof Error) {
-          message += `: ${error.message}`;
-        }
-
-        toast.error(message);
+        const err = error as any;
+        const errorMessage = err.response?.data?.detail || 'فشل في تحديث اللجنة';
+        toast.error(errorMessage);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [formData, selectedFile, committeeId, userID, API_BASE_URL, payload.username]
+    [
+      formData, 
+      selectedFile, 
+      selectedEmployeeIDs, 
+      hasFileChanged, 
+      hasEmployeeChanged,
+      committeeId,
+      API_BASE_URL,
+      router
+    ]
   );
 
-
-  // render pdf file with every record todo separate into component
-  
-
-  const renderPDFs = useMemo(() => {
-    if (pdfFiles.length === 0) {
-      return (
-        <div  className="mt-6 text-center">
-          <p className="font-arabic text-gray-500">لا توجد ملفات PDF مرفقة</p>
-        </div>
-      );
-    }
-
-
-  
-
-
+  if (isLoadingCommittee) {
     return (
-      <div  className="mt-6">
-        <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-teal-500 text-white font-arabic hover:from-blue-600 hover:to-teal-600 transition-all duration-300"
-              onClick={() => setPdfDialogOpen(true)}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              عرض ملفات PDF ({pdfFiles.length})
-            </Button>
-          </DialogTrigger>
-          <DialogContent
-            className="sm:max-w-[90vw] md:max-w-[700px] lg:max-w-[800px] p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl max-h-[80vh] overflow-y-auto"
-            dir="rtl"
-          >
-            <DialogHeader>
-              <DialogTitle className="text-2xl md:text-3xl font-bold text-blue-700 font-arabic text-center">
-                ملفات PDF المرتبطة باللجنة
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {pdfFiles.map((pdf, index) => (
-                <div
-                  key={pdf.id}
-              
-                
-                >
-                  <Card className="bg-white shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl border border-blue-100 overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-blue-100 to-teal-100 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-8 w-8 text-blue-600 animate-pulse" />
-                        <div>
-                          <p className="text-lg font-bold text-gray-800 font-arabic">
-                            رقم اللجنة: {pdf.committeeNo || 'غير متوفر'}
-                          </p>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 text-right space-y-3">
-                      <div className="flex items-center gap-x-2 text-gray-700 font-arabic">
-                        <span className="font-semibold">تاريخ الإضافة:</span>
-                        <span>{pdf.currentDate || 'غير متوفر'}</span>
-                      </div>
-                      <div className="flex items-center gap-x-2 text-gray-700 font-arabic">
-                        <span className="font-semibold">المستخدم:</span>
-                        <span className="text-blue-600 font-bold">
-                          {pdf.username || 'غير معروف'}
-                        </span>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end p-4 bg-gray-50">
-                      <Button
-                        variant="default"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-arabic font-semibold flex items-center gap-2 transition-transform duration-200 hover:scale-105"
-                        onClick={() => {
-                          window.open(
-                            `${API_BASE_URL}/api/committees/pdf/file/${pdf.id}`,
-                            '_blank'
-                          );
-                        }}
-                      >
-                        <FileText className="h-4 w-4" />
-                        عرض الملف
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }, [pdfFiles, pdfDialogOpen, API_BASE_URL]);
-
-  if (isLoading) {
-    console.log('Component is in loading state');
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-slate-400">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-          <p className="font-arabic text-xl text-gray-600">جاري التحميل...</p>
-          <p className="text-sm text-gray-500 mt-2">Committee ID: {committeeId}</p>
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-xl font-arabic text-gray-700">جارٍ تحميل البيانات...</p>
         </div>
       </div>
     );
   }
 
-  console.log("committeeID: " + committeeId);
-
   return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-sky-50/50 py-4 sm:py-6 md:py-8 lg:py-12"
-    
-    >
+    <div className="min-h-screen flex items-center justify-center bg-slate-400 py-4 sm:py-6 md:py-8 lg:py-12">
       <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto p-4 sm:p-6 md:p-8 bg-white rounded-2xl shadow-lg border border-sky-100/50">
-        <h1 className="text-2xl sm:text-3xl md:text-3xl lg:text-3xl font-bold font-arabic text-center text-sky-600 mb-6 sm:mb-8">
-          تحديث اللجنة رقم {formData.committeeNo}
-        </h1>
-        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8" noValidate>
+        
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="ghost" onClick={() => router.back()} className="font-arabic">
+            <ArrowLeft className="ml-2 h-4 w-4" />
+            رجوع
+          </Button>
+          <h1 className="text-2xl sm:text-3xl font-bold font-arabic text-sky-600">
+            تحديث اللجنة
+          </h1>
+          <div className="w-20"></div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-6" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             
-            {/* Committee Number */}
-            <div >
-              <label
-                htmlFor="committeeNo"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
+            <div>
+              <label htmlFor="committeeNo" className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
                 رقم اللجنة
               </label>
               <input
@@ -502,32 +369,24 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 type="text"
                 value={formData.committeeNo}
                 onChange={handleChange}
-                className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
+                className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right"
+                autoComplete="off"
               />
             </div>
 
-            {/* Committee Date */}
-            <div >
-              <label
-                htmlFor="committeeDate"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
+            <div className="text-center">
+              <label className="block text-sm font-extrabold text-gray-700 mb-1">
                 تاريخ اللجنة
               </label>
               <ArabicDatePicker
                 selected={formData.committeeDate}
-                onChange={(date) => handleDateChange('committeeDate', date)}
-                allowEmpty={false}
+                onChange={handleDateChange}
+                label="تاريخ اللجنة"
               />
             </div>
 
-            {/* Committee Title */}
-            <div  className="sm:col-span-2 lg:col-span-1">
-              <label
-                htmlFor="committeeTitle"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
+            <div>
+              <label htmlFor="committeeTitle" className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
                 عنوان اللجنة
               </label>
               <input
@@ -536,79 +395,56 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 type="text"
                 value={formData.committeeTitle}
                 onChange={handleChange}
-                className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
+                className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right"
+                autoComplete="off"
               />
             </div>
 
-            {/* Committee Boss Name */}
-            <div >
-              <label
-                htmlFor="committeeBossName"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
-                اسم رئيس اللجنة
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
+                رئيس اللجنة
               </label>
-              <input
-                id="committeeBossName"
-                name="committeeBossName"
-                type="text"
+              <BossNameAutocomplete
                 value={formData.committeeBossName}
-                onChange={handleChange}
-                className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
+                onChange={(value) => setFormData(prev => ({ ...prev, committeeBossName: value }))}
+                onSelect={handleBossNameSelect}
               />
             </div>
 
-            {/* Sex */}
-            <div >
-              <label
-                htmlFor="sex"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
-                الجنس
+            <div>
+              <label htmlFor="sex" className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
+                الجنس <span className="text-gray-400 text-xs">(اختياري)</span>
               </label>
               <select
                 id="sex"
                 name="sex"
                 value={formData.sex}
                 onChange={handleChange}
-                className="w-full px-4 py-2 h-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                required
+                className="w-full h-12 px-4 py-2 border text-sm font-extrabold border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right"
               >
                 <option value="">اختر الجنس</option>
-                <option value="male">ذكر</option>
-                <option value="female">أنثى</option>
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
               </select>
             </div>
 
-            {/* Committee Count */}
-            <div >
-              <label
-                htmlFor="committeeCount"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
-                عدد اللجنة
+            <div>
+              <label htmlFor="committeeCount" className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
+                عدد أعضاء اللجنة
               </label>
               <input
                 id="committeeCount"
                 name="committeeCount"
-                type="number"
+                type="text"
                 value={formData.committeeCount}
                 onChange={handleChange}
-                className="w-full px-4 py-4 border h-12 border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300 font-arabic text-right"
-                min="0"
+                className="w-full h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right"
+                autoComplete="off"
               />
             </div>
 
-          
-
-            {/* Notes */}
-            <div  className="sm:col-span-2 lg:col-span-3">
-              <label
-                htmlFor="notes"
-                className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right"
-              >
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label htmlFor="notes" className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
                 ملاحظات
               </label>
               <textarea
@@ -616,40 +452,178 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-gray-300 transition-all duration-200 font-arabic text-right resize-y text-sm leading-6 placeholder:text-center placeholder:font-extrabold placeholder:text-gray-300 placeholder:italic"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-arabic text-right resize-y"
                 rows={4}
+                autoComplete="off"
               />
             </div>
           </div>
 
-          {/* Dropzone for PDF Upload */}
-          <div  className="mt-6">
-            <label className="block text-sm font-extrabold font-sans text-gray-700 mb-1 text-right">
-              تحميل ملف PDF جديد
+          {/* Employee Selection */}
+          <div className="mt-6">
+            <label className="block text-sm font-extrabold text-gray-700 mb-2 text-right">
+              أعضاء اللجنة
+              {hasEmployeeChanged && (
+                <span className="mr-2 text-xs text-orange-600 font-normal">
+                  (تم التعديل)
+                </span>
+              )}
+            </label>
+            <EmployeeSelectionDialog
+              selectedEmployeeIDs={selectedEmployeeIDs}
+              onEmployeesSelected={handleEmployeesSelected}
+              maxSelections={50}
+              triggerButtonText="تعديل أعضاء اللجنة"
+              triggerButtonClassName="w-full h-12 text-base"
+            />
+          </div>
+
+          {/* ✅ Display Current Employees - NOW UPDATES WHEN IDs CHANGE */}
+          {selectedEmployeeIDs.length > 0 && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-bold text-blue-700 font-arabic">
+                    الموظفون المحددون ({selectedEmployeeIDs.length})
+                  </h3>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllEmployees}
+                  className="text-red-600 hover:bg-red-100 font-arabic"
+                >
+                  <X className="ml-1 h-4 w-4" />
+                  مسح الكل
+                </Button>
+              </div>
+
+              {isLoadingSelectedEmployees ? (
+                <div className="flex items-center justify-center p-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  <span className="mr-2 text-sm text-gray-600 font-arabic">
+                    جارٍ تحميل البيانات...
+                  </span>
+                </div>
+              ) : selectedEmployees && selectedEmployees.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {selectedEmployees.map((employee: Employee, index: number) => (
+                    <div
+                      key={employee.empID}
+                      className="bg-white border border-blue-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                              {index + 1}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start gap-2 mb-2">
+                            <User className="h-4 w-4 text-blue-600 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-xs text-gray-500 font-arabic">الاسم</p>
+                              <p className="text-sm font-bold font-arabic text-gray-800">
+                                {employee.name}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              <Hash className="h-3 w-3 text-green-600" />
+                              <span className="text-xs text-gray-500">ID: </span>
+                              <span className="text-xs font-bold text-green-600">
+                                {employee.empID}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Hash className="h-3 w-3 text-purple-600" />
+                              <span className="text-xs text-gray-500">رقم: </span>
+                              <span className="text-xs font-bold text-purple-600">
+                                {employee.employee_desc}
+                              </span>
+                            </div>
+                          </div>
+
+                          {employee.genderName && (
+                            <span className="text-xs bg-gray-200 px-2 py-1 rounded mt-2 inline-block font-arabic">
+                              {employee.genderName}
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeEmployee(employee.empID)}
+                          className="w-7 h-7 rounded-full hover:bg-red-100 flex items-center justify-center transition-colors"
+                          title={`إزالة ${employee.name}`}
+                        >
+                          <X className="h-4 w-4 text-red-500 hover:text-red-700" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-4 text-gray-500 text-sm font-arabic">
+                  لا يوجد موظفين محددين
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PDF Upload */}
+          <div className="mt-6">
+            <label className="block text-sm font-extrabold text-gray-700 mb-1 text-right">
+              تحديث ملف PDF
+              <span className="text-xs text-gray-500 font-normal mr-2">(اختياري)</span>
+              {hasFileChanged && (
+                <span className="mr-2 text-xs text-orange-600 font-normal">
+                  (ملف جديد)
+                </span>
+              )}
             </label>
             <DropzoneComponent
               ref={dropzoneRef}
               onFilesAccepted={handleFilesAccepted}
               onFileRemoved={handleFileRemoved}
-              onBookPdfLoaded={handleCommitteePdfLoaded} 
-              username={payload.username}           
+              onBookPdfLoaded={handleBookPdfLoaded}
+              username="haider"
             />
           </div>
 
-          {/* Display PDFs */}
-            {renderPDFs}  
-
-          {/* Submit Button */}
-          <div
-            className="flex justify-center mt-6"
-          
-          >
+          {/* Submit */}
+          <div className="flex justify-center gap-4 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="px-8 py-3 font-arabic font-semibold text-lg"
+              disabled={isSubmitting}
+            >
+              إلغاء
+            </Button>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full md:w-auto px-8 py-2 bg-sky-600 hover:bg-sky-700 text-white font-arabic font-semibold rounded-lg transition-all duration-300 disabled:opacity-50"
+              className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white font-arabic font-semibold text-lg rounded-lg transition-all disabled:opacity-50"
             >
-              {isSubmitting ? 'جاري التحديث...' : 'تحديث اللجنة'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                  جارٍ التحديث...
+                </>
+              ) : (
+                <>
+                  <Save className="ml-2 h-5 w-5" />
+                  تحديث الكتاب
+                  {hasEmployeeChanged && ` (${selectedEmployeeIDs.length} عضو)`}
+                </>
+              )}
             </Button>
           </div>
         </form>
@@ -657,5 +631,3 @@ export default function UpdateCommitteeByID({ committeeId, payload }: UpdateComm
     </div>
   );
 }
-
-

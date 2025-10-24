@@ -1,9 +1,10 @@
 # routes/employees.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 import logging
 from app.models.employee import EmployeeSearchParams
+from app.services.committee import CommitteeService
 from app.services.employee import EmployeeService
 from app.database.database import get_async_db
 
@@ -140,3 +141,24 @@ async def getEmployee(
     except Exception as e:
         logger.error(f"Error getting employee: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+
+@employeesRouter.get("/{committee_id}/employees", response_model=List[Dict[str, Any]] , description='used in alert dialog of table to every committee its members')
+async def getCommitteeEmployees(
+    committee_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Get all employees for a specific committee
+    Returns employee details including name, employee_desc, gender
+    """
+    try:
+        employees = await EmployeeService.getCommitteeEmployeesMethod(db, committee_id)
+        return employees
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching employees for committee {committee_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

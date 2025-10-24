@@ -45,6 +45,7 @@ export interface CommitteeDataTable extends TableData {
   pdfFiles: PDF[];
   countOfCommitteeBooks?: number; // Optional for lateBooks
   pdfCount : number;
+  employeeCount:number;  // numbers or total count of members in specific committee
 
 }
 
@@ -63,7 +64,8 @@ export const HeaderMap: HeaderMap = {
   userID: "ايدي المستخدم",
   username: "المستخدم",
   countOfCommitteeBooks: "عدد الكتب",
-  pdfCount: 'عدد الملفات'
+  pdfCount: 'عدد الملفات',
+  employeeCount:'عدد الاعظاء'
 };
 
 export interface PDFRecord {

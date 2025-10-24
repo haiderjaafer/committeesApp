@@ -33,7 +33,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
   value,
   onChange,
   className,
-  placeholder = "ابحث بالاسم الأول والثاني أو الرقم",
+  placeholder = "ابحث بالاسم الأول والثاني أو رقم الحاسبة",
   maxSelections
 }) => {
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
     staleTime: 60000,
   });
 
-  // ✅ Fetch selected employees - FIXED
+  //  Fetch selected employees - FIXED
   const { data: selectedEmployees, isLoading: isLoadingSelected } = useQuery<Employee[], Error>({
     queryKey: ['employees-selected', value],
     queryFn: async () => {
@@ -105,7 +105,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
               { withCredentials: true }
             );
             console.log(`Fetched employee ${empID}:`, response.data);
-            return response.data.data; // ✅ Extract .data.data
+            return response.data.data; //  Extract .data.data
           } catch (err) {
             console.error(`Error fetching employee ${empID}:`, err);
             return null;
@@ -216,14 +216,14 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
           </Button>
         </PopoverTrigger>
         
-        <PopoverContent className="w-[500px] p-0" align="start">
+        <PopoverContent className="w-[500px]  p-0" align="start">
           {/* Search Header */}
-          <div className="p-3 bg-gray-50 border-b">
+          <div className="p-3 bg-gray-50 border-b ">
             <div className="relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
-                placeholder="اكتب الاسم الأول والثاني أو الرقم..."
+                placeholder=" اكتب الاسم الأول والثاني أو رقم الحاسبة..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10 font-arabic text-right"
@@ -231,12 +231,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
               />
             </div>
             
-            <div className="mt-2 text-xs text-gray-500 space-y-1 font-arabic">
-              <p>💡 أمثلة:</p>
-              <p className="mr-4">• "زهراء حازم" → أسماء تبدأ بـ زهراء حازم</p>
-              <p className="mr-4">• "1022" → موظف رقم 1022 فقط</p>
-            </div>
-
+      
             {value.length > 0 && (
               <Button
                 variant="ghost"
@@ -265,12 +260,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
                 <p className="text-sm text-gray-600 font-bold font-arabic mb-2">
                   ابدأ البحث
                 </p>
-                <div className="text-xs text-gray-500 space-y-1 font-arabic">
-                  <p>اكتب الاسم الأول والثاني</p>
-                  <p className="text-green-600">مثال: زهراء حازم</p>
-                  <p className="mt-2">أو اكتب رقم الموظف</p>
-                  <p className="text-blue-600">مثال: 1022</p>
-                </div>
+                
               </div>
             ) : searchResults && searchResults.length === 0 ? (
               <div className="p-8 text-center">
@@ -348,7 +338,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
         </PopoverContent>
       </Popover>
 
-      {/* ✅ FIXED: Selected employees display with names and X icons */}
+      {/*  FIXED: Selected employees display with names and X icons */}
       {value.length > 0 && (
         <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
@@ -370,7 +360,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
             </Button>
           </div>
           
-          {/* ✅ Show loading or employee names */}
+          {/*  Show loading or employee names */}
           {isLoadingSelected ? (
             <div className="flex items-center justify-center p-4">
               <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
@@ -391,7 +381,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
                       {index + 1}
                     </div>
                     
-                    {/* ✅ Employee name and details */}
+                    {/*  Employee name and details */}
                     <div className="text-right flex-1 min-w-0">
                       <p className="text-sm font-bold font-arabic text-gray-800">
                         {emp.name}
@@ -412,7 +402,7 @@ const MultiSelectEmployees: React.FC<MultiSelectEmployeesProps> = ({
                     </div>
                   </div>
 
-                  {/* ✅ X Remove button */}
+                  {/* X Remove button */}
                   <button
                     onClick={() => removeEmployee(emp.empID, emp.name)}
                     className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-red-100 flex items-center justify-center transition-colors"
