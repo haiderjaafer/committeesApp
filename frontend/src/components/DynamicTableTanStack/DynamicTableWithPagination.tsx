@@ -131,7 +131,7 @@ export default function DynamicTable<T extends CommitteeDataTable>({
   }, []);
 
   const shouldTruncate = useCallback((key: string) => {
-    return ['notes', 'directoryName', 'subject', 'bookAction'].includes(key);
+    return ['committeeTitle'].includes(key);
   }, []);
 
   const getStatusBackgroundColor = useCallback((status: string | null | undefined) => {
@@ -265,18 +265,18 @@ export default function DynamicTable<T extends CommitteeDataTable>({
 
         if (shouldTruncate(key)) {
           columnDef.size = 200;
-        } else if (['bookNo', 'committeeDate', 'bookStatus', 'incomingDate'].includes(key)) {
-          columnDef.size = 100;
-        } else if (key === 'username' || key === 'countOfLateBooks') {
+        } else if ([ 'committeeDate'].includes(key)) {
           columnDef.size = 150;
+        } else if (key === 'username' || key === 'countOfLateBooks') {
+          columnDef.size = 100;
 
         } else if (key === 'committeeDate') {
           columnDef.size = 150;
           
         } else if (key === 'currentDate') {
           columnDef.size = 150;
-        } else if (key === 'bookType') {
-          columnDef.size = 70;
+        } else if (key === 'committeeBossName') {
+          columnDef.size = 200;
 
         } else if (key === 'pdfCount') {
           columnDef.size = 30;

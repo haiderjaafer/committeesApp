@@ -35,3 +35,16 @@
     display: table-footer-group;
   }
 }
+
+/* BossNameReport.css */
+@media print {
+  .committee-group {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  .committee-header-and-table {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

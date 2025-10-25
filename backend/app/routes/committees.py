@@ -778,6 +778,7 @@ async def getCommitteesByBossNameWithDetails(
 
 
 
+
 @committeesRouter.get("/reportBasedOnBossName/{bossName}", response_model=Dict[str, Any])
 async def getCommitteesDetailsByBossNameReport(
     bossName: str,

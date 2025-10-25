@@ -216,8 +216,8 @@ class CommitteeService:
                     end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
                     if start_date > end_date:
                         raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
-                    filters.append(Committee.currentDate.isnot(None))
-                    filters.append(Committee.currentDate.between(start_date, end_date))
+                    filters.append(Committee.committeeDate.isnot(None))
+                    filters.append(Committee.committeeDate.between(start_date, end_date))
                     logger.debug(f"Applying date range filter: {start_date} to {end_date}")
                 except ValueError as e:
                     logger.error(f"Invalid date format: {str(e)}")
@@ -262,7 +262,7 @@ class CommitteeService:
                     Committee.currentDate,
                     Users.username,
                 )
-                .order_by(desc(Committee.currentDate))
+                .order_by(desc(Committee.committeeDate))
                 .offset(offset)
                 .limit(limit)
             )
@@ -321,7 +321,7 @@ class CommitteeService:
 
             logger.info(f"Employee counts: {employee_count_map}")
 
-            # ✅ Step 3: Format response data with employee count
+            #  Step 3: Format response data with employee count
             data = [
                 {
                     "serialNo": offset + i + 1,
@@ -411,8 +411,8 @@ class CommitteeService:
                     end_date = datetime.strptime(committeeDate_to, "%Y-%m-%d").date()
                     if start_date > end_date:
                         raise HTTPException(status_code=400, detail="startDate cannot be after endDate")
-                    filters.append(Committee.currentDate.isnot(None))
-                    filters.append(Committee.currentDate.between(start_date, end_date))
+                    filters.append(Committee.committeeDate.isnot(None))
+                    filters.append(Committee.committeeDate.between(start_date, end_date))
                     logger.debug(f"Applying date range filter: {start_date} to {end_date}")
                 except ValueError as e:
                     logger.error(f"Invalid date format: {str(e)}")
@@ -1138,11 +1138,11 @@ class CommitteeService:
         bossName: str
     ) -> Dict[str, Any]:
         """
-        Get all committees report data by boss name
-        Returns only Committee model fields for report generation
+        Get all committees report data by boss name with employees
+        Returns Committee fields + grouped employees for each committee
         """
         try:
-            logger.info(f"Searching for committees report with boss name: {bossName}")
+            logger.info(f"Searching for committees report with boss name: '{bossName}'")
             
             # Validate boss name
             if not bossName or bossName.strip() == "":
@@ -1151,30 +1151,89 @@ class CommitteeService:
                     detail="Boss name is required"
                 )
             
-            # Query committees with exact match (case-insensitive)
+            clean_boss_name = bossName.strip()
+            logger.info(f"Cleaned boss name: '{clean_boss_name}'")
+            
+            # ✅ Strategy 1: Exact match with LTRIM/RTRIM
             stmt = (
                 select(Committee)
-                .where(Committee.committeeBossName.ilike(bossName))
+                .where(func.ltrim(func.rtrim(Committee.committeeBossName)) == clean_boss_name)
                 .order_by(Committee.committeeDate.desc())
             )
             
             result = await db.execute(stmt)
             committees = result.scalars().all()
             
+            logger.info(f"Found {len(committees)} committees")
+            
+            # Strategy 2: Try LIKE if no exact match
+            if not committees:
+                logger.info("Trying LIKE pattern")
+                stmt = (
+                    select(Committee)
+                    .where(func.ltrim(func.rtrim(Committee.committeeBossName)).like(f"%{clean_boss_name}%"))
+                    .order_by(Committee.committeeDate.desc())
+                )
+                result = await db.execute(stmt)
+                committees = result.scalars().all()
+                logger.info(f"LIKE pattern found: {len(committees)} committees")
+            
             if not committees:
                 return {
                     "success": True,
-                    "message": f"No committees found for boss: {bossName}",
-                    "bossName": bossName,
+                    "message": f"No committees found for boss: {clean_boss_name}",
+                    "bossName": clean_boss_name,
                     "count": 0,
                     "reportDate": datetime.now().isoformat(),
                     "data": []
                 }
             
-            # Build report data with only Committee model fields
+            # ✅ Get all committee IDs
+            committee_ids = [committee.id for committee in committees]
+            
+            # ✅ Fetch ALL employees for these committees in one query
+            employees_stmt = (
+                select(
+                    JunctionCommitteeEmployee.committeeID,
+                    Employee.empID,
+                    Employee.name,
+                    Employee.employee_desc,
+                    Employee.gender
+                )
+                .join(Employee, JunctionCommitteeEmployee.empID == Employee.empID)
+                .filter(JunctionCommitteeEmployee.committeeID.in_(committee_ids))
+                .order_by(JunctionCommitteeEmployee.committeeID, Employee.name.asc())
+            )
+            
+            employees_result = await db.execute(employees_stmt)
+            employees_rows = employees_result.fetchall()
+            
+            logger.info(f"Found {len(employees_rows)} total employees across all committees")
+            
+            # ✅ Group employees by committee ID
+            employees_by_committee = {}
+            for row in employees_rows:
+                committee_id = row.committeeID
+                if committee_id not in employees_by_committee:
+                    employees_by_committee[committee_id] = []
+                
+                employees_by_committee[committee_id].append({
+                    "empID": row.empID,
+                    "name": row.name,
+                    "employee_desc": row.employee_desc,
+                    "gender": row.gender,
+                    "genderName": "ذكر" if row.gender == 1 else "أنثى" if row.gender == 2 else None
+                })
+            
+            # ✅ Build report data with employees
             report_data: List[Dict[str, Any]] = []
+            total_employees = 0
             
             for committee in committees:
+                # Get employees for this committee
+                committee_employees = employees_by_committee.get(committee.id, [])
+                total_employees += len(committee_employees)
+                
                 committee_dict = {
                     "id": committee.id,
                     "committeeNo": committee.committeeNo,
@@ -1185,18 +1244,32 @@ class CommitteeService:
                     "committeeCount": committee.committeeCount,
                     "notes": committee.notes,
                     "currentDate": committee.currentDate.isoformat() if committee.currentDate else None,
-                    "userID": committee.userID
+                    "userID": committee.userID,
+                    # ✅ NEW: Add employees array
+                    "employees": committee_employees,
+                    "employeeCount": len(committee_employees)
                 }
                 report_data.append(committee_dict)
             
-            logger.info(f"Found {len(report_data)} committees for report")
+            logger.info(f"Successfully generated report with {len(report_data)} committees and {total_employees} total employees")
+            
+            # ✅ Calculate statistics
+            male_committees = sum(1 for c in report_data if c.get('sex') == 'ذكر')
+            female_committees = sum(1 for c in report_data if c.get('sex') == 'أنثى')
             
             return {
                 "success": True,
-                "message": f"Report generated successfully",
-                "bossName": bossName,
+                "message": "Report generated successfully",
+                "bossName": clean_boss_name,
                 "count": len(report_data),
                 "reportDate": datetime.now().isoformat(),
+                "totalEmployees": total_employees,  # ✅ NEW
+                "statistics": {  # ✅ NEW
+                    "totalCommittees": len(report_data),
+                    "totalEmployees": total_employees,
+                    "maleCommittees": male_committees,
+                    "femaleCommittees": female_committees
+                },
                 "data": report_data
             }
             
@@ -1207,7 +1280,4 @@ class CommitteeService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Database error: {str(e)}"
-            )
-        
-
-    
+            )    
